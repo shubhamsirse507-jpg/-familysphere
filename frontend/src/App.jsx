@@ -155,6 +155,7 @@ export default function App() {
   const callTimerIntervalRef = useRef(null);
   const audioContextRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const pendingSignalRef = useRef(null);
 
   // ==========================================================================
   // Lifecycle & Synchronization
@@ -322,20 +323,21 @@ export default function App() {
     socket.on('incoming_call', async (data) => {
       const { from, signal, type, chatId } = data;
       
-      // If we are already connected, this is the real WebRTC SDP offer!
-      if (peerConnectionRef.current && signal && signal.type === 'offer') {
-        try {
-          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signal));
-          const answer = await peerConnectionRef.current.createAnswer();
-          await peerConnectionRef.current.setLocalDescription(answer);
-          socketRef.current.emit('accept_call', {
-            toUser: from.id,
-            signalData: answer
-          });
-        } catch (e) {
-          console.error('Error handling late WebRTC offer:', e);
+      if (signal && signal.type === 'offer') {
+        pendingSignalRef.current = signal;
+        if (peerConnectionRef.current) {
+          try {
+            await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signal));
+            const answer = await peerConnectionRef.current.createAnswer();
+            await peerConnectionRef.current.setLocalDescription(answer);
+            socketRef.current.emit('accept_call', {
+              toUser: from.id,
+              signalData: answer
+            });
+          } catch (e) {
+            console.error('Error handling WebRTC offer:', e);
+          }
         }
-        return;
       }
 
       setActiveCall({
@@ -353,12 +355,14 @@ export default function App() {
       stopRingtone();
       setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
       
-      // If this is the real WebRTC SDP answer!
-      if (peerConnectionRef.current && signalData && signalData.type === 'answer') {
-        try {
-          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signalData));
-        } catch (e) {
-          console.error('Error setting remote answer:', e);
+      if (signalData && signalData.type === 'answer') {
+        pendingSignalRef.current = signalData;
+        if (peerConnectionRef.current) {
+          try {
+            await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signalData));
+          } catch (e) {
+            console.error('Error setting remote answer:', e);
+          }
         }
       }
     });
@@ -395,6 +399,7 @@ export default function App() {
       } catch (e) {}
       peerConnectionRef.current = null;
     }
+    pendingSignalRef.current = null;
   };
 
   // ==========================================================================
@@ -1021,30 +1026,43 @@ export default function App() {
       if (partnerId) {
         const pc = createPeerConnection(partnerId, stream);
         
-        // If we are the caller (we started the call), we create the offer
+        // If we are the caller (we started the call)
         if (activeCall.caller.id === user.id) {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socketRef.current.emit('call_user', {
-            userToCall: partnerId,
-            signalData: offer,
-            fromUser: user,
-            type: activeCall.type,
-            chatId: activeChat?.id
-          });
-        } else {
-          // We are the receiver, set remote description of the caller's offer
-          if (activeCall.signal && activeCall.signal !== 'dummy_webrtc_offer') {
+          // If we already received a pending answer, set it immediately
+          if (pendingSignalRef.current && pendingSignalRef.current.type === 'answer') {
             try {
-              await pc.setRemoteDescription(new RTCSessionDescription(activeCall.signal));
+              await pc.setRemoteDescription(new RTCSessionDescription(pendingSignalRef.current));
+              pendingSignalRef.current = null;
+            } catch (e) {
+              console.error('Error applying pending remote answer:', e);
+            }
+          } else {
+            // Otherwise, create and send our offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socketRef.current.emit('call_user', {
+              userToCall: partnerId,
+              signalData: offer,
+              fromUser: user,
+              type: activeCall.type,
+              chatId: activeChat?.id
+            });
+          }
+        } else {
+          // We are the receiver, apply offer and generate answer
+          const signalToApply = pendingSignalRef.current || (activeCall.signal !== 'dummy_webrtc_offer' ? activeCall.signal : null);
+          if (signalToApply && signalToApply.type === 'offer') {
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(signalToApply));
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
               socketRef.current.emit('accept_call', {
                 toUser: partnerId,
                 signalData: answer
               });
+              pendingSignalRef.current = null;
             } catch (e) {
-              console.error('Error setting remote description on offer', e);
+              console.error('Error setting remote description on offer:', e);
             }
           }
         }
