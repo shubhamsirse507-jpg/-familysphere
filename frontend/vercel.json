@@ -9,7 +9,7 @@
       "destination": "https://familysphere-uf95.onrender.com/socket.io/:path*"
     },
     {
-      "source": "/((?!api|socket.io).*)",
+      "source": "/((?!api|socket.io|assets|favicon.ico|logo.png).*)",
       "destination": "/index.html"
     }
   ]
