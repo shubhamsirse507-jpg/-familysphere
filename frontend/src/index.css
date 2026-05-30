@@ -9,9 +9,9 @@
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   /* Theme: Light Mode Default */
-  --bg-primary: #ffffff;      /* Spacious, clean white workspace */
-  --bg-secondary: #f8fafc;    /* Narrow, minimalist light-gray sidebar */
-  --bg-tertiary: #f1f5f9;     /* Slightly darker gray for active states/inputs */
+  --bg-primary: rgba(255, 255, 255, 0.65);   /* Spacious, clean white workspace with opacity */
+  --bg-secondary: rgba(248, 250, 252, 0.82); /* Narrow, minimalist light-gray sidebar with opacity */
+  --bg-tertiary: rgba(241, 245, 249, 0.8);   /* Slightly darker gray for active states/inputs with opacity */
   --bg-glass: rgba(255, 255, 255, 0.75);
   --border-glass: rgba(148, 163, 184, 0.25); /* Slate-400 with opacity for clean borders */
   
@@ -56,9 +56,9 @@
 
 /* Dark Mode Overrides */
 [data-theme="dark"] {
-  --bg-primary: #0b0f19;
-  --bg-secondary: #131929;
-  --bg-tertiary: #1e2640;
+  --bg-primary: rgba(11, 15, 25, 0.65);     /* Workspace dark-navy with opacity */
+  --bg-secondary: rgba(19, 25, 41, 0.82);    /* Sidebar dark-navy with opacity */
+  --bg-tertiary: rgba(30, 38, 64, 0.8);      /* Input fields with opacity */
   --bg-glass: rgba(19, 25, 41, 0.75);
   --border-glass: rgba(255, 255, 255, 0.08);
   
@@ -230,7 +230,10 @@ a {
   border-radius: var(--radius-xl);
   border: 4px solid #1e2640; /* Perfectly smooth, dark-blue border matching the frame */
   box-shadow: var(--shadow-lg);
-  background-color: var(--bg-secondary);
+  background-image: url('/app-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .auth-fullscreen-bg {
@@ -254,6 +257,8 @@ a {
   position: relative;
   z-index: 10;
   overflow: hidden;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: width var(--transition-normal), background-color var(--transition-normal);
 }
 
@@ -267,6 +272,8 @@ a {
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: background-color var(--transition-normal);
 }
 

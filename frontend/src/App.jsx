@@ -1551,7 +1551,7 @@ export default function App() {
             )}
 
             {/* Messages Screen Content */}
-            <div className="messages-scroller" style={{ flex: 1, padding: '24px 20px', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg-primary)', minHeight: 0 }}>
+            <div className="messages-scroller" style={{ flex: 1, padding: '24px 20px', overflowY: 'auto', overflowX: 'hidden', background: 'transparent', minHeight: 0 }}>
               
               {messages.map(msg => {
                 const isMe = msg.senderId === user.id;
