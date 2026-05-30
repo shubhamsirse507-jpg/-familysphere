@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://familysphere-uf95.onrender.com/api/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://familysphere-uf95.onrender.com/socket.io/:path*"
+    },
+    {
+      "source": "/((?!api|socket.io).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
