@@ -154,6 +154,7 @@ export default function App() {
   const remoteVideoRef = useRef(null);
   const callTimerIntervalRef = useRef(null);
   const audioContextRef = useRef(null);
+  const peerConnectionRef = useRef(null);
 
   // ==========================================================================
   // Lifecycle & Synchronization
@@ -318,21 +319,59 @@ export default function App() {
     });
 
     // WebRTC Signaling
-    socket.on('incoming_call', (data) => {
-      const { from, type, chatId } = data;
+    socket.on('incoming_call', async (data) => {
+      const { from, signal, type, chatId } = data;
+      
+      // If we are already connected, this is the real WebRTC SDP offer!
+      if (peerConnectionRef.current && signal && signal.type === 'offer') {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signal));
+          const answer = await peerConnectionRef.current.createAnswer();
+          await peerConnectionRef.current.setLocalDescription(answer);
+          socketRef.current.emit('accept_call', {
+            toUser: from.id,
+            signalData: answer
+          });
+        } catch (e) {
+          console.error('Error handling late WebRTC offer:', e);
+        }
+        return;
+      }
+
       setActiveCall({
         id: Math.random().toString(),
         caller: from,
         receiver: user,
         type,
-        status: 'ringing'
+        status: 'ringing',
+        signal
       });
       playRingtone();
     });
 
-    socket.on('call_accepted', () => {
+    socket.on('call_accepted', async (signalData) => {
       stopRingtone();
       setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
+      
+      // If this is the real WebRTC SDP answer!
+      if (peerConnectionRef.current && signalData && signalData.type === 'answer') {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signalData));
+        } catch (e) {
+          console.error('Error setting remote answer:', e);
+        }
+      }
+    });
+
+    socket.on('webrtc_ice', async (data) => {
+      const { candidate } = data;
+      if (peerConnectionRef.current && candidate) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.error('Error adding ICE Candidate:', e);
+        }
+      }
     });
 
     socket.on('call_declined', () => {
@@ -350,6 +389,12 @@ export default function App() {
     stopMediaStreams();
     setLocalStream(null);
     setRemoteStream(null);
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    }
   };
 
   // ==========================================================================
@@ -923,6 +968,43 @@ export default function App() {
     cleanupCallState();
   };
 
+  const createPeerConnection = (partnerId, localStreamObj) => {
+    if (peerConnectionRef.current) return peerConnectionRef.current;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    // Add local tracks to the connection
+    if (localStreamObj) {
+      localStreamObj.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamObj);
+      });
+    }
+
+    // Handle remote track/stream
+    pc.ontrack = (event) => {
+      const remoteStreamObj = event.streams[0];
+      setRemoteStream(remoteStreamObj);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamObj;
+      }
+    };
+
+    // Relay ICE candidates
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current) {
+        socketRef.current.emit('webrtc_ice', {
+          toUser: partnerId,
+          candidate: event.candidate
+        });
+      }
+    };
+
+    peerConnectionRef.current = pc;
+    return pc;
+  };
+
   const setupMediaStreams = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -934,10 +1016,38 @@ export default function App() {
         localVideoRef.current.srcObject = stream;
       }
       
-      // Simulate peer stream by connecting local stream back to remote window for testing/loopback demo
-      setRemoteStream(stream);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
+      // Initialize Peer Connection
+      const partnerId = activeCall?.caller.id === user.id ? activeCall?.receiver.id : activeCall?.caller.id;
+      if (partnerId) {
+        const pc = createPeerConnection(partnerId, stream);
+        
+        // If we are the caller (we started the call), we create the offer
+        if (activeCall.caller.id === user.id) {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketRef.current.emit('call_user', {
+            userToCall: partnerId,
+            signalData: offer,
+            fromUser: user,
+            type: activeCall.type,
+            chatId: activeChat?.id
+          });
+        } else {
+          // We are the receiver, set remote description of the caller's offer
+          if (activeCall.signal && activeCall.signal !== 'dummy_webrtc_offer') {
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(activeCall.signal));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              socketRef.current.emit('accept_call', {
+                toUser: partnerId,
+                signalData: answer
+              });
+            } catch (e) {
+              console.error('Error setting remote description on offer', e);
+            }
+          }
+        }
       }
     } catch (e) {
       // Create empty canvas mock stream if device lacks camera/mic

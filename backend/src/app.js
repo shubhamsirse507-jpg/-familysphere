@@ -273,6 +273,11 @@ io.on('connection', (socket) => {
     io.to(toUser).emit('call_ended');
   });
 
+  socket.on('webrtc_ice', (data) => {
+    const { toUser, candidate } = data;
+    io.to(toUser).emit('webrtc_ice', { candidate });
+  });
+
   socket.on('disconnect', () => {
     // console.log(`Socket disconnected: ${socket.id}`);
   });
