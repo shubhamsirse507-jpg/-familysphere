@@ -6,10 +6,12 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize';
 
 import { connectDB, sequelize } from './config/db.js';
 import apiRoutes from './routes/api.js';
-import { Message, User, Chat, ChatMember, PollOption, PollVote } from './models/index.js';
+import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, MessageStatus } from './models/index.js';
 import { runSeeding } from './seed.js';
 
 dotenv.config();
@@ -26,6 +28,24 @@ const io = new Server(server, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
+});
+
+const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
+
+// Socket.io JWT Authentication Middleware
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token) {
+    return next();
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    console.error('Socket authentication error:', err.message);
+    next(new Error('Authentication error: Invalid token'));
+  }
 });
 
 app.use(cors());
@@ -77,21 +97,62 @@ io.on('connection', (socket) => {
   // console.log(`Socket connected: ${socket.id}`);
 
   // User authenticates/joins their personal room to receive notifications/calls
-  socket.on('auth', (userId) => {
+  socket.on('auth', async (userId) => {
     socket.join(userId);
-    // console.log(`User ${userId} joined personal socket room`);
+    socket.userId = userId;
+    
+    try {
+      await User.update({ isOnline: true, lastSeen: null }, { where: { id: userId } });
+      io.emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
+    } catch (err) {
+      console.error('Error updating user online status:', err);
+    }
   });
 
   // User joins a specific chat room
   socket.on('join_chat', (chatId) => {
     socket.join(chatId);
-    // console.log(`Socket ${socket.id} joined chat room: ${chatId}`);
   });
 
   // User leaves a chat room
   socket.on('leave_chat', (chatId) => {
     socket.leave(chatId);
-    // console.log(`Socket ${socket.id} left chat room: ${chatId}`);
+  });
+
+  // Mark chat as read
+  socket.on('mark_chat_read', async (data) => {
+    const { chatId, userId } = data;
+    try {
+      const messages = await Message.findAll({ where: { chatId }, attributes: ['id'] });
+      const messageIds = messages.map(m => m.id);
+      if (messageIds.length > 0) {
+        await MessageStatus.update(
+          { status: 'read' },
+          { where: { userId, messageId: messageIds, status: { [Op.ne]: 'read' } } }
+        );
+      }
+      io.to(chatId).emit('messages_read', { chatId, userId });
+    } catch (err) {
+      console.error('Error marking chat read via socket:', err);
+    }
+  });
+
+  // Mark chat as delivered
+  socket.on('mark_chat_delivered', async (data) => {
+    const { chatId, userId } = data;
+    try {
+      const messages = await Message.findAll({ where: { chatId }, attributes: ['id'] });
+      const messageIds = messages.map(m => m.id);
+      if (messageIds.length > 0) {
+        await MessageStatus.update(
+          { status: 'delivered' },
+          { where: { userId, messageId: messageIds, status: 'sent' } }
+        );
+      }
+      io.to(chatId).emit('messages_delivered', { chatId, userId });
+    } catch (err) {
+      console.error('Error marking chat delivered via socket:', err);
+    }
   });
 
   // Send real-time chat message
@@ -99,6 +160,39 @@ io.on('connection', (socket) => {
     const { chatId, senderId, content, type, mediaUrl, replyToId, pollOptions } = data;
     
     try {
+      // Enforce Authorization: Check if sender is a member of the chat
+      const chatMembers = await ChatMember.findAll({ where: { chatId } });
+      const isMember = chatMembers.some(cm => cm.userId === senderId);
+      if (!isMember) {
+        console.warn(`Unauthorized message attempt from ${senderId} in chat ${chatId}`);
+        return;
+      }
+
+      // Check block status (1-to-1 chats only)
+      const currentChat = await Chat.findByPk(chatId, {
+        include: [{ model: User, attributes: ['id'] }],
+      });
+      
+      if (!currentChat) return;
+      
+      if (!currentChat.isGroup) {
+        const partner = currentChat.Users.find(u => u.id !== senderId);
+        if (partner) {
+          const blockExists = await BlockedUser.findOne({
+            where: {
+              [Op.or]: [
+                { blockerId: partner.id, blockedId: senderId },
+                { blockerId: senderId, blockedId: partner.id }
+              ]
+            }
+          });
+          if (blockExists) {
+            console.warn(`Blocked message attempt between ${senderId} and ${partner.id}`);
+            return;
+          }
+        }
+      }
+
       // 1. Moderate message for family safety (local check)
       const toxicKeywords = ['hate', 'stupid', 'jerk', 'shut up', 'damn', 'kill', 'abuse', 'fuck', 'shit'];
       let moderatedContent = content;
@@ -108,7 +202,6 @@ io.on('connection', (socket) => {
       for (const word of toxicKeywords) {
         if (lowerText.includes(word)) {
           wasToxic = true;
-          // Mask toxic words with family-friendly hearts/asterisks
           const regex = new RegExp(word, 'gi');
           moderatedContent = moderatedContent.replace(regex, '❤️🌸');
         }
@@ -134,7 +227,20 @@ io.on('connection', (socket) => {
         }
       }
 
-      // Fetch complete message object with sender attributes for client
+      // Create MessageStatus entries for all other chat members
+      for (const member of chatMembers) {
+        if (member.userId !== senderId) {
+          const recipientSockets = await io.in(member.userId).fetchSockets();
+          const status = recipientSockets.length > 0 ? 'delivered' : 'sent';
+          await MessageStatus.create({
+            messageId: message.id,
+            userId: member.userId,
+            status,
+          });
+        }
+      }
+
+      // Fetch complete message object
       const fullMessage = await Message.findByPk(message.id, {
         include: [
           { model: User, as: 'sender', attributes: ['id', 'name', 'role', 'profilePhoto'] },
@@ -147,6 +253,10 @@ io.on('connection', (socket) => {
           { 
             model: PollOption,
             include: [{ model: PollVote, include: [{ model: User, attributes: ['id', 'name'] }] }]
+          },
+          {
+            model: MessageStatus,
+            attributes: ['userId', 'status']
           }
         ]
       });
@@ -155,12 +265,7 @@ io.on('connection', (socket) => {
       io.to(chatId).emit('new_message', fullMessage);
 
       // 3. AI Assistant Response Generation (if applicable)
-      // Check if the chat is a direct chat with AI or if message tags @ai / starts with "ai "
       const aiUser = await User.findOne({ where: { role: 'AI' } });
-      const currentChat = await Chat.findByPk(chatId, {
-        include: [{ model: User, attributes: ['id', 'role'] }],
-      });
-      
       const isDirectAiChat = !currentChat.isGroup && currentChat.Users.some(u => u.role === 'AI');
       const mentionsAi = content && (content.toLowerCase().includes('@ai') || content.toLowerCase().startsWith('ai '));
 
@@ -168,7 +273,6 @@ io.on('connection', (socket) => {
         // Send a typing status for AI
         io.to(chatId).emit('typing', { chatId, userId: aiUser.id, isTyping: true });
 
-        // Simulate AI process
         setTimeout(async () => {
           let aiPrompt = content;
           if (mentionsAi) {
@@ -199,6 +303,19 @@ io.on('connection', (socket) => {
             replyToId: message.id,
           });
 
+          // Create status for AI message
+          for (const member of chatMembers) {
+            if (member.userId !== aiUser.id) {
+              const recipientSockets = await io.in(member.userId).fetchSockets();
+              const status = recipientSockets.length > 0 ? 'delivered' : 'sent';
+              await MessageStatus.create({
+                messageId: aiMessage.id,
+                userId: member.userId,
+                status,
+              });
+            }
+          }
+
           const fullAiMessage = await Message.findByPk(aiMessage.id, {
             include: [
               { model: User, as: 'sender', attributes: ['id', 'name', 'role', 'profilePhoto'] },
@@ -207,6 +324,10 @@ io.on('connection', (socket) => {
                 as: 'replyTo', 
                 attributes: ['id', 'content', 'type'],
                 include: [{ model: User, as: 'sender', attributes: ['name'] }]
+              },
+              {
+                model: MessageStatus,
+                attributes: ['userId', 'status']
               }
             ]
           });
@@ -215,7 +336,7 @@ io.on('connection', (socket) => {
           io.to(chatId).emit('typing', { chatId, userId: aiUser.id, isTyping: false });
           io.to(chatId).emit('new_message', fullAiMessage);
 
-        }, 1200); // 1.2 second simulated response delay
+        }, 1200);
       }
 
     } catch (error) {
@@ -233,12 +354,9 @@ io.on('connection', (socket) => {
   socket.on('share_location', async (data) => {
     const { userId, latitude, longitude } = data;
     try {
-      // Update database
       await sequelize.query(
         `UPDATE Locations SET latitude = ${latitude}, longitude = ${longitude}, isLive = 1, updatedAt = datetime('now') WHERE userId = '${userId}'`
       );
-      
-      // Broadcast updated location to other family members
       socket.broadcast.emit('location_updated', { userId, latitude, longitude });
     } catch (err) {
       console.error('Location sync error:', err);
@@ -246,20 +364,38 @@ io.on('connection', (socket) => {
   });
 
   // --- WebRTC Peer-to-Peer Calls Signaling ---
-  socket.on('call_user', (data) => {
+  socket.on('call_user', async (data) => {
     const { userToCall, signalData, fromUser, type, chatId } = data;
-    // Notify the target user of incoming call
-    io.to(userToCall).emit('incoming_call', {
-      signal: signalData,
-      from: fromUser,
-      type,
-      chatId,
-    });
+    
+    try {
+      // Block checks for calls
+      const blockExists = await BlockedUser.findOne({
+        where: {
+          [Op.or]: [
+            { blockerId: userToCall, blockedId: fromUser.id },
+            { blockerId: fromUser.id, blockedId: userToCall }
+          ]
+        }
+      });
+      if (blockExists) {
+        socket.emit('call_declined');
+        return;
+      }
+      
+      // Notify the target user of incoming call
+      io.to(userToCall).emit('incoming_call', {
+        signal: signalData,
+        from: fromUser,
+        type,
+        chatId,
+      });
+    } catch (err) {
+      console.error('Call block check error:', err);
+    }
   });
 
   socket.on('accept_call', (data) => {
     const { toUser, signalData } = data;
-    // Notify the caller that call is accepted with answer signal
     io.to(toUser).emit('call_accepted', signalData);
   });
 
@@ -278,8 +414,20 @@ io.on('connection', (socket) => {
     io.to(toUser).emit('webrtc_ice', { candidate });
   });
 
-  socket.on('disconnect', () => {
-    // console.log(`Socket disconnected: ${socket.id}`);
+  socket.on('disconnect', async () => {
+    const userId = socket.userId;
+    if (userId) {
+      try {
+        const activeSockets = await io.in(userId).fetchSockets();
+        if (activeSockets.length === 0) {
+          const lastSeen = new Date();
+          await User.update({ isOnline: false, lastSeen }, { where: { id: userId } });
+          io.emit('user_status_changed', { userId, isOnline: false, lastSeen });
+        }
+      } catch (err) {
+        console.error('Error on disconnect presence update:', err);
+      }
+    }
   });
 });
 

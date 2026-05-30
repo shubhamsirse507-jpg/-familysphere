@@ -14,6 +14,12 @@ const SOCKET_BASE = window.location.hostname === 'localhost' || window.location.
   ? 'http://localhost:5000'
   : 'https://familysphere-uf95.onrender.com';
 
+const resolveMediaUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  return `${SOCKET_BASE}${url}`;
+};
+
 export default function App() {
   // --- UI & Styling State ---
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -44,6 +50,8 @@ export default function App() {
   const [pinnedMessage, setPinnedMessage] = useState(null);
   const [typingUsers, setTypingUsers] = useState({}); // { chatId: { userId: boolean } }
   const [usersList, setUsersList] = useState([]); // All users for starting new chats
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const fileInputRef = useRef(null);
   const [showAddChatModal, setShowAddChatModal] = useState(false);
   const [newChatConfig, setNewChatConfig] = useState({ isGroup: false, name: '', members: [] });
   const [smartReplies, setSmartReplies] = useState([]);
@@ -178,6 +186,10 @@ export default function App() {
   // Fetch initial collections upon login
   useEffect(() => {
     if (user) {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      
       // Connect WebSockets
       initSocket();
       
@@ -186,6 +198,7 @@ export default function App() {
       fetchStories();
       fetchLocations();
       fetchUsersList();
+      fetchBlockedUsers();
 
       // Setup simulated location sharing loop
       const locationInterval = setInterval(() => {
@@ -305,7 +318,9 @@ export default function App() {
   // WebSockets Service Setup
   // ==========================================================================
   const initSocket = () => {
-    const socket = io(SOCKET_BASE);
+    const socket = io(SOCKET_BASE, {
+      auth: { token }
+    });
     socketRef.current = socket;
 
     socket.emit('auth', user.id);
@@ -319,6 +334,15 @@ export default function App() {
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
+        socket.emit('mark_chat_read', { chatId: msg.chatId, userId: user.id });
+      } else {
+        socket.emit('mark_chat_delivered', { chatId: msg.chatId, userId: user.id });
+        if (msg.senderId !== user.id && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification(`New message from ${msg.sender?.name || 'FamilyMember'}`, {
+            body: msg.content,
+            icon: msg.sender?.profilePhoto || '/logo.png'
+          });
+        }
       }
       // Re-trigger chats list fetch to update previews/orders
       fetchChats();
@@ -522,6 +546,112 @@ export default function App() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const fetchBlockedUsers = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/users/blocked`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedUsers(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleBlockUser = async (blockedId) => {
+    try {
+      const res = await fetch(`${API_BASE}/users/block`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ blockedId })
+      });
+      if (res.ok) {
+        fetchBlockedUsers();
+        fetchChats();
+        fetchUsersList();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUnblockUser = async (blockedId) => {
+    try {
+      const res = await fetch(`${API_BASE}/users/unblock`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ blockedId })
+      });
+      if (res.ok) {
+        fetchBlockedUsers();
+        fetchChats();
+        fetchUsersList();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteChat = async (chatId) => {
+    if (!window.confirm('Are you sure you want to delete this chat thread?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/chats/${chatId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setActiveChat(null);
+        fetchChats();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !activeChat) return;
+    
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result;
+      try {
+        const res = await fetch(`${API_BASE}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ base64Data, filename: file.name })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (socketRef.current) {
+            socketRef.current.emit('send_message', {
+              chatId: activeChat.id,
+              senderId: user.id,
+              content: `Shared an image: ${file.name}`,
+              type: 'image',
+              mediaUrl: data.url
+            });
+          }
+        }
+      } catch (err) {
+        console.error('File upload error:', err);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const fetchSmartReplies = async (content) => {
@@ -1849,6 +1979,33 @@ export default function App() {
                   style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                 />
               </div>
+
+              {/* Blocked Users List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', borderTop: '1px solid var(--border-glass)', paddingTop: '16px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Blocked Family Members</label>
+                {blockedUsers.length === 0 ? (
+                  <div style={{ padding: '14px', background: 'var(--bg-tertiary)', borderRadius: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    No members are currently blocked.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {blockedUsers.map(u => (
+                      <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img src={u.profilePhoto || 'https://via.placeholder.com/150'} className="avatar sm" alt={u.name} />
+                          <div>
+                            <div style={{ fontWeight: '600', fontSize: '13px' }}>{u.name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.role}</div>
+                          </div>
+                        </div>
+                        <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px', background: 'var(--color-danger)', boxShadow: 'none' }} onClick={() => handleUnblockUser(u.id)}>
+                          Unblock
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -2063,7 +2220,9 @@ export default function App() {
                   >
                     <div className="avatar-container">
                       <img src={chat.isGroup ? chat.avatar : displayMember?.profilePhoto || 'https://via.placeholder.com/150'} alt="Avatar" className="avatar" />
-                      {!chat.isGroup && displayMember?.role !== 'AI' && <div className="status-dot"></div>}
+                      {!chat.isGroup && displayMember?.role !== 'AI' && (
+                        <div className={`status-dot ${displayMember?.isOnline ? '' : 'offline'}`}></div>
+                      )}
                     </div>
                     
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2632,16 +2791,56 @@ export default function App() {
                     {activeChat.isGroup ? activeChat.name : activeChat.Users.find(u => u.id !== user.id)?.name}
                   </h3>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                    {activeChat.isGroup ? `${activeChat.Users.length} members` : activeChat.Users.find(u => u.id !== user.id)?.role}
+                    {activeChat.isGroup ? (
+                      `${activeChat.Users.length} members`
+                    ) : (
+                      activeChat.Users.find(u => u.id !== user.id)?.isOnline ? (
+                        <span style={{ color: 'var(--color-success)', fontWeight: '600' }}>Online</span>
+                      ) : activeChat.Users.find(u => u.id !== user.id)?.lastSeen ? (
+                        `Last seen: ${new Date(activeChat.Users.find(u => u.id !== user.id).lastSeen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                      ) : (
+                        activeChat.Users.find(u => u.id !== user.id)?.role
+                      )
+                    )}
                   </p>
                 </div>
               </div>
 
               {/* Call Controls & Options */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn-icon" onClick={() => startOutboundCall('voice')}><Phone size={18} /></button>
-                <button className="btn-icon" onClick={() => startOutboundCall('video')}><Video size={18} /></button>
-                <button className="btn-icon" onClick={() => setShowPollBuilder(true)}><BarChart2 size={18} /></button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {(() => {
+                  const partner = activeChat.isGroup ? null : activeChat.Users.find(u => u.id !== user.id);
+                  const isBlocked = partner?.isBlocked || partner?.isBlockingMe;
+                  return (
+                    <>
+                      {!activeChat.isGroup && partner && (
+                        <button 
+                          className="btn-icon" 
+                          title={partner.isBlocked ? "Unblock Contact" : "Block Contact"}
+                          style={{ color: partner.isBlocked ? 'var(--color-success)' : 'var(--color-danger)' }}
+                          onClick={() => partner.isBlocked ? handleUnblockUser(partner.id) : handleBlockUser(partner.id)}
+                        >
+                          {partner.isBlocked ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
+                        </button>
+                      )}
+                      {!isBlocked && (
+                        <>
+                          <button className="btn-icon" onClick={() => startOutboundCall('voice')}><Phone size={18} /></button>
+                          <button className="btn-icon" onClick={() => startOutboundCall('video')}><Video size={18} /></button>
+                          <button className="btn-icon" onClick={() => setShowPollBuilder(true)}><BarChart2 size={18} /></button>
+                        </>
+                      )}
+                      <button 
+                        className="btn-icon" 
+                        title="Delete Chat Thread" 
+                        style={{ color: 'var(--color-danger)' }}
+                        onClick={() => handleDeleteChat(activeChat.id)}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -2739,6 +2938,20 @@ export default function App() {
                             })}
                           </div>
                         </div>
+                      ) : msg.type === 'image' ? (
+                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <img 
+                            src={resolveMediaUrl(msg.mediaUrl || msg.content)} 
+                            alt="Shared file" 
+                            style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '12px', cursor: 'pointer', objectFit: 'cover' }} 
+                            onClick={() => window.open(resolveMediaUrl(msg.mediaUrl || msg.content), '_blank')}
+                          />
+                          {msg.content && msg.content !== msg.mediaUrl && !msg.content.startsWith('Shared an image') && (
+                            <div style={{ fontSize: '14px', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {msg.content}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div style={{ fontSize: '14px', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                           {msg.content}
@@ -2771,7 +2984,21 @@ export default function App() {
                         opacity: 0.8
                       }}>
                         <span>{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        {isMe && <CheckCheck size={12} style={{ color: 'var(--color-primary)' }} />}
+                        {isMe && (() => {
+                          if (!msg.MessageStatuses || msg.MessageStatuses.length === 0) {
+                            return <Check size={12} style={{ color: 'var(--text-tertiary)' }} />;
+                          }
+                          const statuses = msg.MessageStatuses;
+                          const isRead = statuses.every(s => s.status === 'read');
+                          const isDelivered = statuses.every(s => s.status === 'delivered' || s.status === 'read');
+                          if (isRead) {
+                            return <CheckCheck size={12} style={{ color: 'var(--color-primary)' }} />;
+                          } else if (isDelivered) {
+                            return <CheckCheck size={12} style={{ color: 'var(--text-tertiary)' }} />;
+                          } else {
+                            return <Check size={12} style={{ color: 'var(--text-tertiary)' }} />;
+                          }
+                        })()}
                       </div>
 
                     </div>
@@ -2809,19 +3036,41 @@ export default function App() {
             )}
 
             {/* Chat message composer input form */}
-            <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px', padding: '16px 20px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-glass)', alignItems: 'center' }}>
-              <button type="button" className="btn-icon" onClick={triggerVoiceTranscribe}><Mic size={18} /></button>
-              <input 
-                type="text" 
-                placeholder="Type a message or type '@ai' to query family assistant..." 
-                className="input-field" 
-                value={inputText}
-                onChange={handleTypingState}
-              />
-              <button type="submit" className="btn-primary" style={{ padding: '12px 16px', borderRadius: '12px' }}>
-                <Send size={18} />
-              </button>
-            </form>
+            {(() => {
+              const partner = activeChat.isGroup ? null : activeChat.Users.find(u => u.id !== user.id);
+              const isBlocked = partner?.isBlocked || partner?.isBlockingMe;
+              return (
+                <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px', padding: '16px 20px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-glass)', alignItems: 'center' }}>
+                  {isBlocked ? (
+                    <div style={{ flex: 1, textAlign: 'center', padding: '10px', color: 'var(--text-secondary)', fontSize: '14px', background: 'var(--bg-tertiary)', borderRadius: '12px' }}>
+                      {partner?.isBlocked ? "You have blocked this contact. Unblock to send messages." : "This contact is unavailable."}
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" className="btn-icon" onClick={triggerVoiceTranscribe}><Mic size={18} /></button>
+                      <button type="button" className="btn-icon" onClick={() => fileInputRef.current?.click()}><Paperclip size={18} /></button>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        accept="image/*" 
+                        onChange={handleFileUpload} 
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Type a message or type '@ai' to query family assistant..." 
+                        className="input-field" 
+                        value={inputText}
+                        onChange={handleTypingState}
+                      />
+                      <button type="submit" className="btn-primary" style={{ padding: '12px 16px', borderRadius: '12px' }}>
+                        <Send size={18} />
+                      </button>
+                    </>
+                  )}
+                </form>
+              );
+            })()}
 
           </div>
         ) : activeTab === 'settings' ? (

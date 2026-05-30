@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { Story, StoryView, User } from '../models/index.js';
+import { Story, StoryView, User, BlockedUser } from '../models/index.js';
 
 export const createStory = async (req, res) => {
   try {
@@ -30,13 +30,28 @@ export const createStory = async (req, res) => {
 
 export const getActiveStories = async (req, res) => {
   try {
+    const userId = req.user.id;
     // Only fetch stories where expiresAt > now
     const now = new Date();
+    
+    // Find blocks involving the user
+    const blocks = await BlockedUser.findAll({
+      where: {
+        [Op.or]: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      }
+    });
+    const blockedUserIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
     
     const stories = await Story.findAll({
       where: {
         expiresAt: {
           [Op.gt]: now
+        },
+        userId: {
+          [Op.notIn]: blockedUserIds
         }
       },
       include: [

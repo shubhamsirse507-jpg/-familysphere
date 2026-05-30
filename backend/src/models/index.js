@@ -38,6 +38,14 @@ export const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  isOnline: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  lastSeen: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 // --- Chat Model ---
@@ -230,6 +238,30 @@ export const Location = sequelize.define('Location', {
   },
 });
 
+// --- BlockedUser Model ---
+export const BlockedUser = sequelize.define('BlockedUser', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  blockerId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  blockedId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+}, {
+  indexes: [
+    {
+      unique: true,
+      fields: ['blockerId', 'blockedId'],
+    }
+  ]
+});
+
 // =================== ASSOCIATIONS ===================
 
 // Chat <-> User (Many-to-Many via ChatMember)
@@ -285,6 +317,11 @@ Call.belongsTo(Chat, { foreignKey: 'chatId' });
 // Locations
 User.hasOne(Location, { foreignKey: 'userId', onDelete: 'CASCADE' });
 Location.belongsTo(User, { foreignKey: 'userId' });
+
+// Blocked Users
+User.hasMany(BlockedUser, { as: 'blockedUsers', foreignKey: 'blockerId', onDelete: 'CASCADE' });
+BlockedUser.belongsTo(User, { as: 'blocker', foreignKey: 'blockerId' });
+BlockedUser.belongsTo(User, { as: 'blocked', foreignKey: 'blockedId' });
 
 // Sync database function helper
 export const syncDatabase = async (force = false) => {

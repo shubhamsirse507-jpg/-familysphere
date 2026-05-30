@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User, Location } from '../models/index.js';
+import { User, Location, BlockedUser } from '../models/index.js';
+import { Op } from 'sequelize';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
 
@@ -147,10 +148,39 @@ export const updateProfile = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
+    const userId = req.user.id;
+    
+    // Find blocks involving the user
+    const blocks = await BlockedUser.findAll({
+      where: {
+        [Op.or]: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      }
+    });
+    
+    const usersWhoBlockedMe = blocks.filter(b => b.blockedId === userId).map(b => b.blockerId);
+    const usersIBlocked = new Set(blocks.filter(b => b.blockerId === userId).map(b => b.blockedId));
+    
     const users = await User.findAll({
+      where: {
+        id: {
+          [Op.notIn]: usersWhoBlockedMe
+        }
+      },
       attributes: ['id', 'name', 'phone', 'email', 'role', 'profilePhoto'],
     });
-    res.json(users);
+    
+    const filteredUsers = users.map(u => {
+      const uJson = u.toJSON();
+      if (usersIBlocked.has(u.id)) {
+        uJson.isBlocked = true;
+      }
+      return uJson;
+    });
+    
+    res.json(filteredUsers);
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Server error' });

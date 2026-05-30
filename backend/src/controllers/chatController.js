@@ -1,4 +1,5 @@
-import { Chat, ChatMember, Message, User, PollOption, PollVote, MessageStatus } from '../models/index.js';
+import { Chat, ChatMember, Message, User, PollOption, PollVote, MessageStatus, BlockedUser } from '../models/index.js';
+import { Op } from 'sequelize';
 
 export const getChats = async (req, res) => {
   try {
@@ -17,7 +18,7 @@ export const getChats = async (req, res) => {
       include: [
         {
           model: User,
-          attributes: ['id', 'name', 'email', 'phone', 'role', 'profilePhoto'],
+          attributes: ['id', 'name', 'email', 'phone', 'role', 'profilePhoto', 'isOnline', 'lastSeen'],
           through: { attributes: [] },
         },
         {
@@ -27,6 +28,31 @@ export const getChats = async (req, res) => {
           include: [{ model: User, as: 'sender', attributes: ['name'] }],
         }
       ],
+    });
+    
+    // Get block relationships involving the user
+    const blocks = await BlockedUser.findAll({
+      where: {
+        [Op.or]: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      }
+    });
+    const blockedUserIds = new Set(blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId));
+    
+    // Mask details of blocked users
+    chats.forEach(chat => {
+      chat.Users.forEach(u => {
+        if (blockedUserIds.has(u.id)) {
+          u.setDataValue('isOnline', false);
+          u.setDataValue('lastSeen', null);
+          u.setDataValue('profilePhoto', null);
+          const isBlockedByMe = blocks.some(b => b.blockerId === userId && b.blockedId === u.id);
+          u.setDataValue('isBlocked', isBlockedByMe);
+          u.setDataValue('isBlockingMe', !isBlockedByMe);
+        }
+      });
     });
     
     // Sort chats so that chats with the latest messages appear first
@@ -46,6 +72,13 @@ export const getChats = async (req, res) => {
 export const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
+    const userId = req.user.id;
+    
+    // Check authorization: User must be a member of the chat
+    const isMember = await ChatMember.findOne({ where: { chatId, userId } });
+    if (!isMember) {
+      return res.status(403).json({ error: 'You are not a member of this chat' });
+    }
     
     const messages = await Message.findAll({
       where: { chatId },
@@ -61,9 +94,22 @@ export const getMessages = async (req, res) => {
         { 
           model: PollOption,
           include: [{ model: PollVote, include: [{ model: User, attributes: ['id', 'name'] }] }]
+        },
+        {
+          model: MessageStatus,
+          attributes: ['userId', 'status']
         }
       ]
     });
+    
+    // Mark these messages as read for current user
+    const messageIds = messages.map(m => m.id);
+    if (messageIds.length > 0) {
+      await MessageStatus.update(
+        { status: 'read' },
+        { where: { userId, messageId: messageIds, status: { [Op.ne]: 'read' } } }
+      );
+    }
     
     res.json(messages);
   } catch (error) {
@@ -142,6 +188,14 @@ export const createChat = async (req, res) => {
 export const pinMessage = async (req, res) => {
   try {
     const { chatId, messageId } = req.body;
+    const userId = req.user.id;
+    
+    // Check authorization: User must be a member of the chat
+    const isMember = await ChatMember.findOne({ where: { chatId, userId } });
+    if (!isMember) {
+      return res.status(403).json({ error: 'You are not a member of this chat' });
+    }
+    
     const chat = await Chat.findByPk(chatId);
     
     if (!chat) {
@@ -163,9 +217,17 @@ export const votePoll = async (req, res) => {
     const { optionId } = req.body;
     const userId = req.user.id;
     
-    const option = await PollOption.findByPk(optionId);
+    const option = await PollOption.findByPk(optionId, {
+      include: [{ model: Message, attributes: ['chatId'] }]
+    });
     if (!option) {
       return res.status(404).json({ error: 'Poll option not found' });
+    }
+    
+    // Check authorization: User must be a member of the chat this poll belongs to
+    const isMember = await ChatMember.findOne({ where: { chatId: option.Message.chatId, userId } });
+    if (!isMember) {
+      return res.status(403).json({ error: 'You are not a member of this chat' });
     }
     
     // Find all options of the same poll/message to clear user's existing vote (single-select poll simulation)
@@ -190,5 +252,32 @@ export const votePoll = async (req, res) => {
   } catch (error) {
     console.error('Vote poll error:', error);
     res.status(500).json({ error: 'Server error casting vote' });
+  }
+};
+
+export const deleteChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    
+    // Check membership
+    const membership = await ChatMember.findOne({ where: { chatId, userId } });
+    if (!membership) {
+      return res.status(403).json({ error: 'You are not authorized to delete/leave this chat' });
+    }
+    
+    // Remove the member
+    await membership.destroy();
+    
+    // If no members are left, delete the chat entirely
+    const remainingMembers = await ChatMember.count({ where: { chatId } });
+    if (remainingMembers === 0) {
+      await Chat.destroy({ where: { id: chatId } });
+    }
+    
+    res.json({ message: 'Chat removed successfully' });
+  } catch (error) {
+    console.error('Delete chat error:', error);
+    res.status(500).json({ error: 'Server error removing chat' });
   }
 };

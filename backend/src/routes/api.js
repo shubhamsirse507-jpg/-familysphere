@@ -13,7 +13,10 @@ import {
   createChat,
   pinMessage,
   votePoll,
+  deleteChat,
 } from '../controllers/chatController.js';
+import { blockUser, unblockUser, getBlockedUsers } from '../controllers/userController.js';
+import { uploadMedia } from '../controllers/uploadController.js';
 import {
   createStory,
   getActiveStories,
@@ -46,6 +49,15 @@ router.get('/chats/:chatId/messages', protect, getMessages);
 router.post('/chats', protect, createChat);
 router.post('/chats/pin', protect, pinMessage);
 router.post('/chats/vote', protect, votePoll);
+router.delete('/chats/:chatId', protect, deleteChat);
+
+// --- User Management / Blocks ---
+router.post('/users/block', protect, blockUser);
+router.post('/users/unblock', protect, unblockUser);
+router.get('/users/blocked', protect, getBlockedUsers);
+
+// --- Media Upload ---
+router.post('/upload', protect, uploadMedia);
 
 // --- Story / Status Routes ---
 router.post('/stories', protect, createStory);

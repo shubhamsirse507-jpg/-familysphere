@@ -1,4 +1,5 @@
-import { Location, User } from '../models/index.js';
+import { Location, User, BlockedUser } from '../models/index.js';
+import { Op } from 'sequelize';
 
 export const updateLocation = async (req, res) => {
   try {
@@ -34,9 +35,27 @@ export const updateLocation = async (req, res) => {
 
 export const getFamilyLocations = async (req, res) => {
   try {
-    // Only return live coordinates of family members
+    const userId = req.user.id;
+    
+    // Get block relationships involving the user
+    const blocks = await BlockedUser.findAll({
+      where: {
+        [Op.or]: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      }
+    });
+    const blockedUserIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
+    
+    // Only return live coordinates of family members, excluding blocked ones
     const locations = await Location.findAll({
-      where: { isLive: true },
+      where: { 
+        isLive: true,
+        userId: {
+          [Op.notIn]: blockedUserIds
+        }
+      },
       include: [{ model: User, attributes: ['id', 'name', 'role', 'profilePhoto'] }],
     });
     
