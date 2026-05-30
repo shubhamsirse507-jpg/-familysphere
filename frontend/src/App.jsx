@@ -5,7 +5,8 @@ import {
   Search, Send, MoreVertical, Paperclip, Smile, Mic, Volume2, 
   Video, PhoneOff, Pin, UserPlus, Menu, Sun, Moon, LogOut, 
   Settings, Globe, ShieldAlert, Trash2, Check, CheckCheck, Eye, 
-  X, Info, Map, ChevronRight, BarChart2, ShieldCheck, HelpCircle
+  X, Info, Map, ChevronRight, BarChart2, ShieldCheck, HelpCircle,
+  Image, Users, Heart, Share2, MessageCircle, Lock, EyeOff, CheckSquare, Bell, Cloud, Award
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -76,6 +77,70 @@ export default function App() {
   const [aiAssistantInput, setAiAssistantInput] = useState('');
   const [autoModerateActive, setAutoModerateActive] = useState(true);
   const [translateTarget, setTranslateTarget] = useState('Spanish');
+
+  // --- Expanded Social Features State ---
+  const [feedPosts, setFeedPosts] = useState([
+    {
+      id: 1,
+      sender: { name: 'Jane Doe (Mom)', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150' },
+      content: 'Sunday Dinner is locked in! Making roast chicken and mashed potatoes. Let me know if you want any specific sides! 🍗🥔',
+      image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600',
+      likes: 4,
+      likedByMe: true,
+      comments: [
+        { id: 1, sender: 'Billy Doe (Son)', content: 'Can we get garlic bread please?? 🙏' },
+        { id: 2, sender: 'Dad', content: 'Count me in, sounds delicious!' }
+      ],
+      createdAt: '2 hours ago'
+    },
+    {
+      id: 2,
+      sender: { name: 'Dad', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
+      content: 'Finally mowed the back lawn! Circles group "Sunday Outings" - please check the scheduled poll for our upcoming hiking trip details. ☀️🏃‍♂️',
+      image: null,
+      likes: 2,
+      likedByMe: false,
+      comments: [],
+      createdAt: 'Yesterday'
+    }
+  ]);
+  const [newPostText, setNewPostText] = useState('');
+  const [newPostImage, setNewPostImage] = useState('');
+
+  const [sharedPhotos, setSharedPhotos] = useState([
+    { id: 1, title: 'Summer Vacation 2025', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500', uploader: 'Jane Doe (Mom)', date: 'June 15, 2025' },
+    { id: 2, title: 'Son Graduation Day 🎓', url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=500', uploader: 'Dad', date: 'May 12, 2026' },
+    { id: 3, title: 'Sunday Picnic', url: 'https://images.unsplash.com/photo-1526218626217-dc65a29bb444?w=500', uploader: 'Billy Doe (Son)', date: '2 weeks ago' },
+    { id: 4, title: 'Gardening Projects 🌻', url: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=500', uploader: 'Jane Doe (Mom)', date: '3 days ago' }
+  ]);
+  const [newMemoryTitle, setNewMemoryTitle] = useState('');
+  const [newMemoryUrl, setNewMemoryUrl] = useState('');
+
+  const [circlesList, setCirclesList] = useState([
+    { id: 1, name: 'Kitchen Duties 🍽️', description: 'Coordinating dish washing, grocery lists, and weekly meal prep.', memberCount: 3 },
+    { id: 2, name: 'Sunday Outings 🚗', description: 'Planning weekend hikes, dinners, and family road trips.', memberCount: 4 },
+    { id: 3, name: 'Tech Support 💻', description: 'Helping grandparents set up their devices and troubleshooting WiFi issues.', memberCount: 2 }
+  ]);
+  const [newCircleName, setNewCircleName] = useState('');
+  const [newCircleDesc, setNewCircleDesc] = useState('');
+
+  // --- Granular Settings Toggles ---
+  const [settingsForm, setSettingsForm] = useState({
+    bio: 'Proud Parent. Coordinator of the weekly family schedules. 🏡❤️',
+    customStatus: 'Coding a new website... 💻',
+    handle: '@mom_coordinates',
+    allowLocationTracking: true,
+    allowOnlinePresence: true,
+    allowTimelinePosts: true,
+    notificationDMs: true,
+    notificationGroupTags: true,
+    notificationLikes: true,
+    notificationTrackerAlerts: true,
+    mediaHD: true,
+    cloudStorageLimit: 50, // GB
+    cloudStorageUsed: 12.4 // GB
+  });
+  const [activeSettingsSubTab, setActiveSettingsSubTab] = useState('account');
 
   // --- Refs ---
   const socketRef = useRef(null);
@@ -1176,11 +1241,581 @@ export default function App() {
         </div>
       </div>
     );
-  }
+  };
 
   // ==========================================================================
-  // Render Dashboard
+  // Expanded Social Workspace Render Functions
   // ==========================================================================
+
+  const renderFeedWorkspace = () => {
+    return (
+      <div style={{ flex: 1, padding: '40px', overflowY: 'auto', background: 'transparent', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)' }}>Family Feed Timeline</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>A shared timeline to post announcements, photos, and general updates for your family.</p>
+          </div>
+          <Globe size={28} style={{ color: 'var(--color-primary)' }} />
+        </div>
+
+        {/* Create Post Form */}
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (!newPostText.trim()) return;
+          const newPost = {
+            id: feedPosts.length + 1,
+            sender: { name: user.name, role: user.role, avatar: user.profilePhoto || 'https://via.placeholder.com/150' },
+            content: newPostText,
+            image: newPostImage.trim() || null,
+            likes: 0,
+            likedByMe: false,
+            comments: [],
+            createdAt: 'Just now'
+          };
+          setFeedPosts([newPost, ...feedPosts]);
+          setNewPostText('');
+          setNewPostImage('');
+        }} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-secondary)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-glass)', maxWidth: '720px' }}>
+          <textarea 
+            placeholder="What's going on in the family? Share an update..." 
+            className="input-field" 
+            style={{ minHeight: '80px', resize: 'none', background: 'var(--bg-tertiary)' }}
+            value={newPostText}
+            onChange={(e) => setNewPostText(e.target.value)}
+            required
+          />
+          <input 
+            type="text" 
+            placeholder="Add an image URL to your post (optional)..." 
+            className="input-field" 
+            style={{ background: 'var(--bg-tertiary)' }}
+            value={newPostImage}
+            onChange={(e) => setNewPostImage(e.target.value)}
+          />
+          <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>
+            Publish Post
+          </button>
+        </form>
+
+        {/* Feed Posts List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '720px' }}>
+          {feedPosts.map(post => (
+            <div key={post.id} className="glass-card" style={{ padding: '24px', borderRadius: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', boxShadow: 'var(--shadow-sm)' }}>
+              {/* Post Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <img src={post.sender.avatar} className="avatar" alt="Avatar" />
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: '700' }}>{post.sender.name}</h4>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{post.sender.role} • {post.createdAt}</p>
+                </div>
+              </div>
+              
+              {/* Post Body */}
+              <p style={{ fontSize: '14px', lineHeight: '1.5', color: 'var(--text-primary)', marginBottom: '14px' }}>{post.content}</p>
+              
+              {post.image && (
+                <img src={post.image} style={{ width: '100%', borderRadius: '16px', marginBottom: '14px', objectFit: 'cover', maxHeight: '350px' }} alt="Post media" />
+              )}
+
+              {/* Post Actions */}
+              <div style={{ display: 'flex', gap: '20px', borderTop: '1px solid var(--border-glass)', paddingTop: '12px', color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>
+                <button 
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', color: post.likedByMe ? 'var(--color-primary)' : 'var(--text-secondary)' }}
+                  onClick={() => {
+                    setFeedPosts(feedPosts.map(p => p.id === post.id ? {
+                      ...p,
+                      likes: p.likedByMe ? p.likes - 1 : p.likes + 1,
+                      likedByMe: !p.likedByMe
+                    } : p));
+                  }}
+                >
+                  <Heart size={16} fill={post.likedByMe ? 'var(--color-primary)' : 'transparent'} />
+                  <span>{post.likes} Likes</span>
+                </button>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MessageCircle size={16} />
+                  <span>{post.comments.length} Comments</span>
+                </span>
+              </div>
+
+              {/* Comments list block */}
+              {post.comments.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px', marginBottom: '12px' }}>
+                  {post.comments.map(c => (
+                    <div key={c.id} style={{ fontSize: '12px', lineHeight: '1.4' }}>
+                      <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{c.sender}:</span>{' '}
+                      <span style={{ color: 'var(--text-secondary)' }}>{c.content}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Post comment input */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const commentInput = e.target.elements[`comment-${post.id}`];
+                if (!commentInput.value.trim()) return;
+                const nextComments = [...post.comments, {
+                  id: post.comments.length + 1,
+                  sender: user.name,
+                  content: commentInput.value
+                }];
+                setFeedPosts(feedPosts.map(p => p.id === post.id ? { ...p, comments: nextComments } : p));
+                commentInput.value = '';
+              }} style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  name={`comment-${post.id}`}
+                  type="text" 
+                  placeholder="Write a comment..." 
+                  className="input-field" 
+                  style={{ padding: '8px 12px', fontSize: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' }}
+                />
+                <button type="submit" className="btn-primary" style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12px' }}>
+                  Send
+                </button>
+              </form>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMemoriesWorkspace = () => {
+    return (
+      <div style={{ flex: 1, padding: '40px', overflowY: 'auto', background: 'transparent', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)' }}>Shared Memories Album</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>A high-resolution visual repository compiling graduation days, vacations, and family picnics.</p>
+          </div>
+          <Sparkles size={28} style={{ color: 'var(--color-primary)' }} />
+        </div>
+
+        {/* Share Memory Form */}
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (!newMemoryTitle.trim() || !newMemoryUrl.trim()) return;
+          const newMem = {
+            id: sharedPhotos.length + 1,
+            title: newMemoryTitle,
+            url: newMemoryUrl,
+            uploader: user.name,
+            date: 'Just now'
+          };
+          setSharedPhotos([newMem, ...sharedPhotos]);
+          setNewMemoryTitle('');
+          setNewMemoryUrl('');
+        }} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-secondary)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-glass)', maxWidth: '720px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <input 
+              type="text" 
+              placeholder="Memory title (e.g. Picnic)..." 
+              className="input-field" 
+              style={{ background: 'var(--bg-tertiary)' }}
+              value={newMemoryTitle}
+              onChange={(e) => setNewMemoryTitle(e.target.value)}
+              required
+            />
+            <input 
+              type="text" 
+              placeholder="Photo URL..." 
+              className="input-field" 
+              style={{ background: 'var(--bg-tertiary)' }}
+              value={newMemoryUrl}
+              onChange={(e) => setNewMemoryUrl(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>
+            Add Memory Photo
+          </button>
+        </form>
+
+        {/* Grid of Shared Media */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+          {sharedPhotos.map(photo => (
+            <div key={photo.id} className="glass-card" style={{ borderRadius: '20px', overflow: 'hidden', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ position: 'relative', height: '220px', width: '100%' }}>
+                <img src={photo.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Memory" />
+                <span style={{ position: 'absolute', bottom: '12px', left: '12px', background: 'rgba(0,0,0,0.65)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: '600' }}>
+                  Uploaded By: {photo.uploader}
+                </span>
+              </div>
+              <div style={{ padding: '18px' }}>
+                <h4 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>{photo.title}</h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Date: {photo.date}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCirclesWorkspace = () => {
+    return (
+      <div style={{ flex: 1, padding: '40px', overflowY: 'auto', background: 'transparent', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)' }}>Circles Community Hub</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Group community spaces organizing weekly chores, road trip schedules, and gardening projects.</p>
+          </div>
+          <Users size={28} style={{ color: 'var(--color-primary)' }} />
+        </div>
+
+        {/* Add Circle Form */}
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (!newCircleName.trim()) return;
+          const newCircle = {
+            id: circlesList.length + 1,
+            name: newCircleName,
+            description: newCircleDesc.trim() || 'No description provided.',
+            memberCount: 1
+          };
+          setCirclesList([...circlesList, newCircle]);
+          setNewCircleName('');
+          setNewCircleDesc('');
+        }} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-secondary)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-glass)', maxWidth: '720px' }}>
+          <input 
+            type="text" 
+            placeholder="Circle Name (e.g. Garden Chores)..." 
+            className="input-field" 
+            style={{ background: 'var(--bg-tertiary)' }}
+            value={newCircleName}
+            onChange={(e) => setNewCircleName(e.target.value)}
+            required
+          />
+          <textarea 
+            placeholder="Circle Description / Topic..." 
+            className="input-field" 
+            style={{ minHeight: '60px', resize: 'none', background: 'var(--bg-tertiary)' }}
+            value={newCircleDesc}
+            onChange={(e) => setNewCircleDesc(e.target.value)}
+          />
+          <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>
+            Launch Circle Space
+          </button>
+        </form>
+
+        {/* Circles Panels List */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          {circlesList.map(circle => (
+            <div key={circle.id} className="glass-card" style={{ padding: '24px', borderRadius: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--color-primary)' }}>{circle.name}</h3>
+                <span style={{ fontSize: '11px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', padding: '4px 10px', borderRadius: '20px', fontWeight: '700' }}>
+                  {circle.memberCount} members
+                </span>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{circle.description}</p>
+              
+              <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-primary)' }}>Active Circle Tasks:</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" defaultChecked style={{ pointerEvents: 'none' }} />
+                  <span>Announcements pinned to the timeline</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" style={{ pointerEvents: 'none' }} />
+                  <span>Assign chores checklist to family members</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSettingsWorkspace = () => {
+    return (
+      <div style={{ flex: 1, padding: '40px', overflowY: 'auto', background: 'transparent', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)' }}>Settings Dashboard</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Configure your profile details, sharing permissions, and AI premium settings.</p>
+          </div>
+          <Settings size={28} style={{ color: 'var(--color-primary)' }} />
+        </div>
+
+        {/* Account & Profile SubTab */}
+        {activeSettingsSubTab === 'account' && (
+          <div className="glass-card animate-fade-in" style={{ padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
+            <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px' }}>
+              <UserPlus size={20} /> Account & Profile
+            </h3>
+            
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+              <img src={user.profilePhoto || 'https://via.placeholder.com/150'} className="avatar lg" alt="Avatar" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Profile Photo URL</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  style={{ background: 'var(--bg-tertiary)' }}
+                  value={user.profilePhoto} 
+                  onChange={e => setUser({ ...user, profilePhoto: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Full Name</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  style={{ background: 'var(--bg-tertiary)' }}
+                  value={user.name} 
+                  onChange={e => setUser({ ...user, name: e.target.value })}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Username Handle</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  style={{ background: 'var(--bg-tertiary)' }}
+                  value={settingsForm.handle} 
+                  onChange={e => setSettingsForm({ ...settingsForm, handle: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bio Description</label>
+              <textarea 
+                className="input-field" 
+                style={{ minHeight: '60px', resize: 'none', background: 'var(--bg-tertiary)' }}
+                value={settingsForm.bio} 
+                onChange={e => setSettingsForm({ ...settingsForm, bio: e.target.value })}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Custom Status</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                style={{ background: 'var(--bg-tertiary)' }}
+                value={settingsForm.customStatus} 
+                onChange={e => setSettingsForm({ ...settingsForm, customStatus: e.target.value })}
+              />
+            </div>
+
+            <button className="btn-primary" style={{ alignSelf: 'flex-end' }} onClick={async () => {
+              try {
+                const res = await fetch(`${API_BASE}/auth/profile`, {
+                  method: 'PUT',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                  },
+                  body: JSON.stringify({ name: user.name, profilePhoto: user.profilePhoto, role: user.role })
+                });
+                if (res.ok) alert('Profile updated successfully!');
+              } catch(e) {
+                alert('Saved profile preferences locally.');
+              }
+            }}>Save Preferences</button>
+          </div>
+        )}
+
+        {/* Privacy & Sharing SubTab */}
+        {activeSettingsSubTab === 'privacy' && (
+          <div className="glass-card animate-fade-in" style={{ padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
+            <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px' }}>
+              <Lock size={20} /> Privacy & Sharing Permissions
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Share Live GPS Coordinate Location</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Allow family members to see your live position on the Tracker Map.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.allowLocationTracking} 
+                  onChange={() => setSettingsForm({ ...settingsForm, allowLocationTracking: !settingsForm.allowLocationTracking })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Show Online & Active Status Presence</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Show green status dot when active inside chat threads.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.allowOnlinePresence} 
+                  onChange={() => setSettingsForm({ ...settingsForm, allowOnlinePresence: !settingsForm.allowOnlinePresence })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Allow Timeline Post Contributions</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Allow relatives to comment and like your timeline posts.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.allowTimelinePosts} 
+                  onChange={() => setSettingsForm({ ...settingsForm, allowTimelinePosts: !settingsForm.allowTimelinePosts })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Feed & Content Preferences SubTab */}
+        {activeSettingsSubTab === 'feed' && (
+          <div className="glass-card animate-fade-in" style={{ padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
+            <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px' }}>
+              <CheckSquare size={20} /> Feed & Content Preferences
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Media Upload Quality (High-Definition)</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Upload photos in full HD (uses more storage cache). Toggle off for Data Saver.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.mediaHD} 
+                  onChange={() => setSettingsForm({ ...settingsForm, mediaHD: !settingsForm.mediaHD })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Chat Filter & Block Lists</label>
+                <div style={{ padding: '14px', background: 'var(--bg-tertiary)', borderRadius: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  No members are currently muted or blocked from your family timeline.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notifications SubTab */}
+        {activeSettingsSubTab === 'notifications' && (
+          <div className="glass-card animate-fade-in" style={{ padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
+            <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px' }}>
+              <Bell size={20} /> Granular Notification Alerts
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Direct Messages Alerts</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Notify instantly on incoming 1-on-1 chats.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.notificationDMs} 
+                  onChange={() => setSettingsForm({ ...settingsForm, notificationDMs: !settingsForm.notificationDMs })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Family Group Mentions & Tags</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Notify when someone tags you in a family circle or group chat.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.notificationGroupTags} 
+                  onChange={() => setSettingsForm({ ...settingsForm, notificationGroupTags: !settingsForm.notificationGroupTags })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Status Likes & Reactions</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Notify when family members react to your stories or posts.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.notificationLikes} 
+                  onChange={() => setSettingsForm({ ...settingsForm, notificationLikes: !settingsForm.notificationLikes })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Tracker Proximity Alerts</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Notify when family members enter or exit coordinate geofence bounds.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsForm.notificationTrackerAlerts} 
+                  onChange={() => setSettingsForm({ ...settingsForm, notificationTrackerAlerts: !settingsForm.notificationTrackerAlerts })} 
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Data & Storage SubTab */}
+        {activeSettingsSubTab === 'data' && (
+          <div className="glass-card animate-fade-in" style={{ padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
+            <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px' }}>
+              <Cloud size={20} /> Data & Shared Cloud Storage
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>
+                  <span>Family Shared Media Cloud Cache</span>
+                  <span>{settingsForm.cloudStorageUsed} GB / {settingsForm.cloudStorageLimit} GB</span>
+                </div>
+                <div style={{ width: '100%', height: '14px', background: 'var(--bg-tertiary)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div style={{ width: `${(settingsForm.cloudStorageUsed / settingsForm.cloudStorageLimit) * 100}%`, height: '100%', background: 'var(--gradient-premium)' }}></div>
+                </div>
+              </div>
+
+              <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '16px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                💾 <b>Shared Storage Breakdown:</b><br/>
+                • Family Photos & Videos: 8.2 GB<br/>
+                • Audio Clips & Voice Notes: 2.1 GB<br/>
+                • Location Coordinates Log cache: 2.1 GB
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Subscription & Upgrades SubTab */}
+        {activeSettingsSubTab === 'subscription' && (
+          <div className="glass-card animate-fade-in" style={{ padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
+            <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px' }}>
+              <Award size={20} /> Plan & Upgrades
+            </h3>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: 'var(--bg-tertiary)', borderRadius: '16px', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: '800', fontSize: '16px', color: 'var(--color-primary)' }}>FamilySphere AI Premium Plan</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Unlocks unlimited translation and smart Gemini replies.</div>
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: '800', background: 'var(--color-primary-light)', color: 'var(--color-primary)', padding: '6px 14px', borderRadius: '8px' }}>
+                ACTIVE (Free Dev Trial)
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="app-container">
@@ -1469,13 +2104,286 @@ export default function App() {
             </div>
           )}
 
+          {/* F. FEED (Family Timeline) TAB */}
+          {activeTab === 'feed' && (
+            <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+              <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Family Feed</h3>
+              </div>
+              
+              {/* Create Post Form */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPostText.trim()) return;
+                const newPost = {
+                  id: feedPosts.length + 1,
+                  sender: { name: user.name, role: user.role, avatar: user.profilePhoto || 'https://via.placeholder.com/150' },
+                  content: newPostText,
+                  image: newPostImage.trim() || null,
+                  likes: 0,
+                  likedByMe: false,
+                  comments: [],
+                  createdAt: 'Just now'
+                };
+                setFeedPosts([newPost, ...feedPosts]);
+                setNewPostText('');
+                setNewPostImage('');
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '16px' }}>
+                <textarea 
+                  placeholder="Share a family update..." 
+                  className="input-field" 
+                  style={{ minHeight: '60px', resize: 'none', background: 'var(--bg-secondary)', fontSize: '13px' }}
+                  value={newPostText}
+                  onChange={(e) => setNewPostText(e.target.value)}
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Image URL (optional)..." 
+                  className="input-field" 
+                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '11px', borderRadius: '8px' }}
+                  value={newPostImage}
+                  onChange={(e) => setNewPostImage(e.target.value)}
+                />
+                <button type="submit" className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px', alignSelf: 'flex-end', borderRadius: '8px' }}>
+                  Post
+                </button>
+              </form>
+
+              {/* Scrollable Feed List */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {feedPosts.map(post => (
+                  <div key={post.id} style={{ background: 'var(--bg-tertiary)', padding: '14px', borderRadius: '16px', border: '1px solid var(--border-glass)' }}>
+                    {/* Post Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                      <img src={post.sender.avatar} className="avatar sm" alt="Avatar" />
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '13px' }}>{post.sender.name}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{post.sender.role} • {post.createdAt}</div>
+                      </div>
+                    </div>
+                    {/* Post Content */}
+                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '8px', lineHeight: '1.4' }}>
+                      {post.content}
+                    </div>
+                    {post.image && (
+                      <img src={post.image} style={{ width: '100%', borderRadius: '12px', marginBottom: '8px', objectFit: 'cover', maxHeight: '160px' }} alt="Post" />
+                    )}
+                    {/* Post Actions */}
+                    <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid var(--border-glass)', paddingTop: '8px', marginBottom: '8px' }}>
+                      <button 
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: post.likedByMe ? 'var(--color-primary)' : 'var(--text-secondary)' }}
+                        onClick={() => {
+                          setFeedPosts(feedPosts.map(p => p.id === post.id ? {
+                            ...p,
+                            likes: p.likedByMe ? p.likes - 1 : p.likes + 1,
+                            likedByMe: !p.likedByMe
+                          } : p));
+                        }}
+                      >
+                        <Heart size={14} fill={post.likedByMe ? 'var(--color-primary)' : 'transparent'} />
+                        <span>{post.likes}</span>
+                      </button>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <MessageCircle size={14} />
+                        <span>{post.comments.length}</span>
+                      </span>
+                    </div>
+                    {/* Comments List */}
+                    {post.comments.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid var(--border-glass)' }}>
+                        {post.comments.slice(0, 2).map(comment => (
+                          <div key={comment.id} style={{ fontSize: '11px' }}>
+                            <span style={{ fontWeight: '700' }}>{comment.sender}:</span> <span style={{ color: 'var(--text-secondary)' }}>{comment.content}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* G. MEMORIES (Shared Media) TAB */}
+          {activeTab === 'memories' && (
+            <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Shared Memories</h3>
+              </div>
+              
+              {/* Share a photo memory */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newMemoryTitle.trim() || !newMemoryUrl.trim()) return;
+                const newMem = {
+                  id: sharedPhotos.length + 1,
+                  title: newMemoryTitle,
+                  url: newMemoryUrl,
+                  uploader: user.name,
+                  date: 'Just now'
+                };
+                setSharedPhotos([newMem, ...sharedPhotos]);
+                setNewMemoryTitle('');
+                setNewMemoryUrl('');
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '16px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Memory title (e.g. Picnic)..." 
+                  className="input-field" 
+                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '12px' }}
+                  value={newMemoryTitle}
+                  onChange={(e) => setNewMemoryTitle(e.target.value)}
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Photo URL..." 
+                  className="input-field" 
+                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '12px' }}
+                  value={newMemoryUrl}
+                  onChange={(e) => setNewMemoryUrl(e.target.value)}
+                  required
+                />
+                <button type="submit" className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px', alignSelf: 'flex-end', borderRadius: '8px' }}>
+                  Share Memory
+                </button>
+              </form>
+
+              {/* Photos Grid */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {sharedPhotos.map(photo => (
+                  <div key={photo.id} className="glass-card" style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-glass)' }}>
+                    <img src={photo.url} style={{ width: '100%', height: '80px', objectFit: 'cover' }} alt="Memory" />
+                    <div style={{ padding: '8px' }}>
+                      <div style={{ fontWeight: '700', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{photo.title}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>By: {photo.uploader}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* H. CIRCLES (Community Channels) TAB */}
+          {activeTab === 'circles' && (
+            <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Family Circles</h3>
+              </div>
+              
+              {/* Create new circle */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!newCircleName.trim()) return;
+                const newCircle = {
+                  id: circlesList.length + 1,
+                  name: newCircleName,
+                  description: newCircleDesc.trim() || 'No description provided.',
+                  memberCount: 1
+                };
+                setCirclesList([...circlesList, newCircle]);
+                setNewCircleName('');
+                setNewCircleDesc('');
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '16px' }}>
+                <input 
+                  type="text" 
+                  placeholder="Circle Name (e.g. Garden)..." 
+                  className="input-field" 
+                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '12px' }}
+                  value={newCircleName}
+                  onChange={(e) => setNewCircleName(e.target.value)}
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Short Description..." 
+                  className="input-field" 
+                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '12px' }}
+                  value={newCircleDesc}
+                  onChange={(e) => setNewCircleDesc(e.target.value)}
+                />
+                <button type="submit" className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px', alignSelf: 'flex-end', borderRadius: '8px' }}>
+                  Create Circle
+                </button>
+              </form>
+
+              {/* Circles List */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {circlesList.map(circle => (
+                  <div key={circle.id} className="chat-thread-row" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '700' }}>{circle.name}</h4>
+                      <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '6px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                        {circle.memberCount} members
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.3' }}>{circle.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* I. SETTINGS TAB */}
+          {activeTab === 'settings' && (
+            <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Control Panel</h3>
+              </div>
+              
+              {/* Settings navigation menu list */}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button 
+                  onClick={() => setActiveSettingsSubTab('account')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', width: '100%', background: activeSettingsSubTab === 'account' ? 'var(--color-primary-light)' : 'transparent', color: activeSettingsSubTab === 'account' ? 'var(--color-primary)' : 'var(--text-primary)', textAlign: 'left', fontWeight: activeSettingsSubTab === 'account' ? '700' : '500' }}
+                >
+                  <UserPlus size={18} />
+                  <span>Account & Profile</span>
+                </button>
+                <button 
+                  onClick={() => setActiveSettingsSubTab('privacy')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', width: '100%', background: activeSettingsSubTab === 'privacy' ? 'var(--color-primary-light)' : 'transparent', color: activeSettingsSubTab === 'privacy' ? 'var(--color-primary)' : 'var(--text-primary)', textAlign: 'left', fontWeight: activeSettingsSubTab === 'privacy' ? '700' : '500' }}
+                >
+                  <Lock size={18} />
+                  <span>Privacy & Sharing</span>
+                </button>
+                <button 
+                  onClick={() => setActiveSettingsSubTab('feed')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', width: '100%', background: activeSettingsSubTab === 'feed' ? 'var(--color-primary-light)' : 'transparent', color: activeSettingsSubTab === 'feed' ? 'var(--color-primary)' : 'var(--text-primary)', textAlign: 'left', fontWeight: activeSettingsSubTab === 'feed' ? '700' : '500' }}
+                >
+                  <CheckSquare size={18} />
+                  <span>Feed Preferences</span>
+                </button>
+                <button 
+                  onClick={() => setActiveSettingsSubTab('notifications')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', width: '100%', background: activeSettingsSubTab === 'notifications' ? 'var(--color-primary-light)' : 'transparent', color: activeSettingsSubTab === 'notifications' ? 'var(--color-primary)' : 'var(--text-primary)', textAlign: 'left', fontWeight: activeSettingsSubTab === 'notifications' ? '700' : '500' }}
+                >
+                  <Bell size={18} />
+                  <span>Notifications</span>
+                </button>
+                <button 
+                  onClick={() => setActiveSettingsSubTab('data')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', width: '100%', background: activeSettingsSubTab === 'data' ? 'var(--color-primary-light)' : 'transparent', color: activeSettingsSubTab === 'data' ? 'var(--color-primary)' : 'var(--text-primary)', textAlign: 'left', fontWeight: activeSettingsSubTab === 'data' ? '700' : '500' }}
+                >
+                  <Cloud size={18} />
+                  <span>Data & Storage</span>
+                </button>
+                <button 
+                  onClick={() => setActiveSettingsSubTab('subscription')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderRadius: '12px', width: '100%', background: activeSettingsSubTab === 'subscription' ? 'var(--color-primary-light)' : 'transparent', color: activeSettingsSubTab === 'subscription' ? 'var(--color-primary)' : 'var(--text-primary)', textAlign: 'left', fontWeight: activeSettingsSubTab === 'subscription' ? '700' : '500' }}
+                >
+                  <Award size={18} />
+                  <span>Subscription</span>
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Bottom Navigation */}
-        <div style={{
-          height: '64px', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-secondary)',
-          display: 'flex', justifyContent: 'space-around', alignItems: 'center'
-        }}>
+        <div className="bottom-nav">
           <button className={`nav-btn ${activeTab === 'chats' ? 'active' : ''}`} onClick={() => { setActiveTab('chats'); setActiveChat(null); }}>
             <MessageSquare size={20} />
             <span>Chats</span>
@@ -1483,6 +2391,18 @@ export default function App() {
           <button className={`nav-btn ${activeTab === 'status' ? 'active' : ''}`} onClick={() => { setActiveTab('status'); setActiveChat(null); }}>
             <Camera size={20} />
             <span>Status</span>
+          </button>
+          <button className={`nav-btn ${activeTab === 'feed' ? 'active' : ''}`} onClick={() => { setActiveTab('feed'); setActiveChat(null); }}>
+            <Globe size={20} />
+            <span>Feed</span>
+          </button>
+          <button className={`nav-btn ${activeTab === 'memories' ? 'active' : ''}`} onClick={() => { setActiveTab('memories'); setActiveChat(null); }}>
+            <Image size={20} />
+            <span>Memories</span>
+          </button>
+          <button className={`nav-btn ${activeTab === 'circles' ? 'active' : ''}`} onClick={() => { setActiveTab('circles'); setActiveChat(null); }}>
+            <Users size={20} />
+            <span>Circles</span>
           </button>
           <button className={`nav-btn ${activeTab === 'map' ? 'active' : ''}`} onClick={() => { setActiveTab('map'); setActiveChat(null); }}>
             <Map size={20} />
@@ -1495,6 +2415,10 @@ export default function App() {
           <button className={`nav-btn ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => { setActiveTab('ai'); setActiveChat(null); }}>
             <Brain size={20} />
             <span>AI Hub</span>
+          </button>
+          <button className={`nav-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setActiveChat(null); }}>
+            <Settings size={20} />
+            <span>Settings</span>
           </button>
         </div>
 
@@ -1720,6 +2644,14 @@ export default function App() {
             </form>
 
           </div>
+        ) : activeTab === 'settings' ? (
+          renderSettingsWorkspace()
+        ) : activeTab === 'feed' ? (
+          renderFeedWorkspace()
+        ) : activeTab === 'memories' ? (
+          renderMemoriesWorkspace()
+        ) : activeTab === 'circles' ? (
+          renderCirclesWorkspace()
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', padding: '40px' }}>
             <div style={{

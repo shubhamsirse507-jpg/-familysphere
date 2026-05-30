@@ -459,3 +459,66 @@ a {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
 }
+
+/* ==========================================================================
+   Premium Navigation Bar & Active Transitions
+   ========================================================================== */
+.bottom-nav {
+  height: 68px;
+  border-top: 1px solid var(--border-glass);
+  background: var(--bg-secondary);
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  -ms-overflow-style: none;  /* Hide scrollbar for IE/Edge */
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
+}
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  cursor: pointer;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  min-width: 62px;
+}
+
+.nav-btn:hover {
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.nav-btn.active {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.nav-btn svg {
+  stroke-width: 2px;
+  transition: fill var(--transition-fast), stroke var(--transition-fast), transform var(--transition-fast);
+}
+
+.nav-btn.active svg {
+  fill: var(--color-primary);
+  stroke: var(--color-primary);
+  transform: scale(1.1);
+}
