@@ -35,6 +35,10 @@ export default function App() {
   // --- Chat State ---
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
+  const activeChatRef = useRef(null);
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [pinnedMessage, setPinnedMessage] = useState(null);
@@ -283,7 +287,7 @@ export default function App() {
     // Incoming messages
     socket.on('new_message', (msg) => {
       // If message is in currently open chat, append
-      if (activeChat && msg.chatId === activeChat.id) {
+      if (activeChatRef.current && msg.chatId === activeChatRef.current.id) {
         setMessages(prev => {
           // Deduplicate if already present
           if (prev.some(m => m.id === msg.id)) return prev;
