@@ -1,0 +1,16 @@
+{
+  "short_name": "FamilySphere",
+  "name": "FamilySphere Family Hub",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#f6f8fb",
+  "theme_color": "#6366f1",
+  "display": "standalone",
+  "orientation": "portrait"
+}
