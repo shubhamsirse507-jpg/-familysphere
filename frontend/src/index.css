@@ -9,9 +9,9 @@
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   /* Theme: Light Mode Default */
-  --bg-primary: #f6f8fb;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f0f3f6;
+  --bg-primary: #ffffff;      /* Spacious, clean white workspace */
+  --bg-secondary: #f8fafc;    /* Narrow, minimalist light-gray sidebar */
+  --bg-tertiary: #f1f5f9;     /* Slightly darker gray for active states/inputs */
   --bg-glass: rgba(255, 255, 255, 0.75);
   --border-glass: rgba(148, 163, 184, 0.25); /* Slate-400 with opacity for clean borders */
   
@@ -30,7 +30,7 @@
   /* Message Bubble Colors */
   --bubble-user: #e0e7ff;
   --bubble-user-text: #1e1b4b;
-  --bubble-other: #ffffff;
+  --bubble-other: #f1f5f9;    /* Standout light-gray on white background */
   --bubble-other-text: #1e293b;
   --bubble-ai: #ecfdf5;
   --bubble-ai-text: #064e3b;
@@ -104,12 +104,12 @@ html {
 
 body {
   font-family: var(--font-body);
-  background-color: var(--bg-primary);
+  background-color: #070b19; /* Solid, deep-navy background to frame the app mockup */
   color: var(--text-primary);
   font-size: 15px;
   line-height: 1.5;
   overflow: hidden;
-  height: 100%;
+  height: 100vh;
   width: 100vw;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -120,6 +120,9 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -218,10 +221,25 @@ a {
    ========================================================================== */
 .app-container {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: calc(100vh - 48px);
+  width: calc(100vw - 48px);
+  max-width: 1600px;
+  max-height: 1000px;
   overflow: hidden;
   position: relative;
+  border-radius: var(--radius-xl);
+  border: 4px solid #1e2640; /* Perfectly smooth, dark-blue border matching the frame */
+  box-shadow: var(--shadow-lg);
+  background-color: var(--bg-secondary);
+}
+
+.auth-fullscreen-bg {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999;
 }
 
 /* Sidebar (Left Side Desktop / Main View Mobile) */
@@ -254,8 +272,18 @@ a {
 
 /* Responsive Overrides (Mobile-First Layout) */
 @media (max-width: 768px) {
+  body {
+    background-color: var(--bg-primary) !important;
+    padding: 0 !important;
+  }
   .app-container {
     flex-direction: column;
+    height: 100vh !important;
+    width: 100vw !important;
+    border-radius: 0 !important;
+    border: none !important;
+    max-width: none !important;
+    max-height: none !important;
   }
   
   .sidebar {
