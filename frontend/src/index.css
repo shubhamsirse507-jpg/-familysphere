@@ -243,6 +243,10 @@ a {
   width: 100vw !important;
   height: 100vh !important;
   z-index: 9999;
+  background-image: url('/app-bg.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
 }
 
 /* Sidebar (Left Side Desktop / Main View Mobile) */

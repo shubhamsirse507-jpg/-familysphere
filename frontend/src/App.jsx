@@ -1033,10 +1033,13 @@ export default function App() {
         <div className="glass-card" style={{
           width: '100%',
           maxWidth: '440px',
-          background: 'rgba(255, 255, 255, 0.95)',
+          background: 'var(--bg-glass)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           borderRadius: '24px',
           padding: '40px 32px',
           boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-glass)',
           margin: 'auto'
         }}>
           {/* Logo */}
