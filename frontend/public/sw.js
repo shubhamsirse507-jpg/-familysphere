@@ -1,5 +1,5 @@
 // Basic Service Worker for FamilySphere PWA Installability
-const CACHE_NAME = 'familysphere-v1';
+const CACHE_NAME = 'familysphere-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -16,8 +16,19 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      return cachedResponse || fetch(e.request);
-    })
+    fetch(e.request)
+      .then((response) => {
+        // If it's a valid response, clone and update the cache
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(e.request);
+      })
   );
 });
