@@ -155,6 +155,7 @@ export default function App() {
   const callTimerIntervalRef = useRef(null);
   const audioContextRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const localStreamRef = useRef(null);
   const pendingSignalRef = useRef(null);
 
   // ==========================================================================
@@ -277,6 +278,29 @@ export default function App() {
     }
   }, [activeCall?.status]);
 
+  // Handle local microphone mute state changes
+  useEffect(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !isMuted;
+      });
+    }
+  }, [isMuted, localStream]);
+
+  // Dynamically assign local stream to localVideoRef when element renders
+  useEffect(() => {
+    if (localStream && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, activeCall?.status, activeCall?.type]);
+
+  // Dynamically assign remote stream to remoteVideoRef when element renders
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, activeCall?.status, activeCall?.type]);
+
   // ==========================================================================
   // WebSockets Service Setup
   // ==========================================================================
@@ -334,21 +358,28 @@ export default function App() {
               toUser: from.id,
               signalData: answer
             });
+            return; // Return early: we are already connected, do not reset to ringing
           } catch (e) {
             console.error('Error handling WebRTC offer:', e);
           }
         }
       }
 
-      setActiveCall({
-        id: Math.random().toString(),
-        caller: from,
-        receiver: user,
-        type,
-        status: 'ringing',
-        signal
+      setActiveCall(prev => {
+        // If we are already connected or ringing, do not reset the state or restart the ringtone
+        if (prev && (prev.status === 'connected' || prev.status === 'ringing')) {
+          return prev;
+        }
+        playRingtone();
+        return {
+          id: Math.random().toString(),
+          caller: from,
+          receiver: user,
+          type,
+          status: 'ringing',
+          signal
+        };
       });
-      playRingtone();
     });
 
     socket.on('call_accepted', async (signalData) => {
@@ -393,6 +424,7 @@ export default function App() {
     stopMediaStreams();
     setLocalStream(null);
     setRemoteStream(null);
+    setIsMuted(false);
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
@@ -1010,106 +1042,122 @@ export default function App() {
     return pc;
   };
 
-  const setupMediaStreams = async () => {
+  const createMockStream = (isVideo) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    
+    let angle = 0;
+    const drawMock = () => {
+      if (!activeCall) return;
+      ctx.fillStyle = "#1e2640";
+      ctx.fillRect(0, 0, 320, 240);
+      
+      ctx.fillStyle = "#818cf8";
+      ctx.beginPath();
+      ctx.arc(160 + Math.sin(angle) * 50, 120 + Math.cos(angle) * 40, 25, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = "#fff";
+      ctx.font = "14px Outfit";
+      ctx.fillText(isVideo ? "Simulating video call..." : "Simulating voice call...", 80, 220);
+      
+      angle += 0.05;
+      requestAnimationFrame(drawMock);
+    };
+    
+    drawMock();
+    const mockStream = canvas.captureStream(30);
+
+    // Create a silent audio track using Web Audio API
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+      const dest = ctxAudio.createMediaStreamDestination();
+      const silenceTrack = dest.stream.getAudioTracks()[0];
+      if (silenceTrack) {
+        mockStream.addTrack(silenceTrack);
+      }
+    } catch (e) {
+      console.warn("Could not create mock audio track:", e);
+    }
+
+    return mockStream;
+  };
+
+  const setupMediaStreams = async () => {
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
         video: activeCall?.type === 'video',
         audio: true
       });
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+    } catch (e) {
+      console.warn("Could not load real media hardware, generating simulated stream", e);
+      stream = createMockStream(activeCall?.type === 'video');
+    }
+
+    setLocalStream(stream);
+    localStreamRef.current = stream;
+
+    // Simulate loopback stream for AI virtual assistant call
+    const partner = activeCall?.caller.id === user.id ? activeCall?.receiver : activeCall?.caller;
+    if (partner?.role === 'AI') {
+      setRemoteStream(stream);
+    }
+    
+    // Initialize Peer Connection
+    const partnerId = partner?.id;
+    if (partnerId && partner?.role !== 'AI') {
+      const pc = createPeerConnection(partnerId, stream);
       
-      // Initialize Peer Connection
-      const partnerId = activeCall?.caller.id === user.id ? activeCall?.receiver.id : activeCall?.caller.id;
-      if (partnerId) {
-        const pc = createPeerConnection(partnerId, stream);
-        
-        // If we are the caller (we started the call)
-        if (activeCall.caller.id === user.id) {
-          // If we already received a pending answer, set it immediately
-          if (pendingSignalRef.current && pendingSignalRef.current.type === 'answer') {
-            try {
-              await pc.setRemoteDescription(new RTCSessionDescription(pendingSignalRef.current));
-              pendingSignalRef.current = null;
-            } catch (e) {
-              console.error('Error applying pending remote answer:', e);
-            }
-          } else {
-            // Otherwise, create and send our offer
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current.emit('call_user', {
-              userToCall: partnerId,
-              signalData: offer,
-              fromUser: user,
-              type: activeCall.type,
-              chatId: activeChat?.id
-            });
+      // If we are the caller (we started the call)
+      if (activeCall.caller.id === user.id) {
+        // If we already received a pending answer, set it immediately
+        if (pendingSignalRef.current && pendingSignalRef.current.type === 'answer') {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(pendingSignalRef.current));
+            pendingSignalRef.current = null;
+          } catch (e) {
+            console.error('Error applying pending remote answer:', e);
           }
         } else {
-          // We are the receiver, apply offer and generate answer
-          const signalToApply = pendingSignalRef.current || (activeCall.signal !== 'dummy_webrtc_offer' ? activeCall.signal : null);
-          if (signalToApply && signalToApply.type === 'offer') {
-            try {
-              await pc.setRemoteDescription(new RTCSessionDescription(signalToApply));
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              socketRef.current.emit('accept_call', {
-                toUser: partnerId,
-                signalData: answer
-              });
-              pendingSignalRef.current = null;
-            } catch (e) {
-              console.error('Error setting remote description on offer:', e);
-            }
+          // Otherwise, create and send our offer
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketRef.current.emit('call_user', {
+            userToCall: partnerId,
+            signalData: offer,
+            fromUser: user,
+            type: activeCall.type,
+            chatId: activeChat?.id
+          });
+        }
+      } else {
+        // We are the receiver, apply offer and generate answer
+        const signalToApply = pendingSignalRef.current || (activeCall.signal !== 'dummy_webrtc_offer' ? activeCall.signal : null);
+        if (signalToApply && signalToApply.type === 'offer') {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(signalToApply));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socketRef.current.emit('accept_call', {
+              toUser: partnerId,
+              signalData: answer
+            });
+            pendingSignalRef.current = null;
+          } catch (e) {
+            console.error('Error setting remote description on offer:', e);
           }
         }
-      }
-    } catch (e) {
-      // Create empty canvas mock stream if device lacks camera/mic
-      console.warn("Could not load real media hardware, generating simulated stream", e);
-      const canvas = document.createElement("canvas");
-      canvas.width = 320;
-      canvas.height = 240;
-      const ctx = canvas.getContext("2d");
-      
-      let angle = 0;
-      const drawMock = () => {
-        if (!activeCall) return;
-        ctx.fillStyle = "#1e2640";
-        ctx.fillRect(0, 0, 320, 240);
-        
-        ctx.fillStyle = "#818cf8";
-        ctx.beginPath();
-        ctx.arc(160 + Math.sin(angle) * 50, 120 + Math.cos(angle) * 40, 25, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = "#fff";
-        ctx.font = "14px Outfit";
-        ctx.fillText("Simulating camera stream...", 80, 220);
-        
-        angle += 0.05;
-        requestAnimationFrame(drawMock);
-      };
-      
-      drawMock();
-      const mockStream = canvas.captureStream(30);
-      setLocalStream(mockStream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mockStream;
-      }
-      setRemoteStream(mockStream);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = mockStream;
       }
     }
   };
 
   const stopMediaStreams = () => {
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
     }
   };
 
@@ -2844,6 +2892,11 @@ export default function App() {
                   <span style={{ position: 'absolute', bottom: '6px', left: '6px', fontSize: '10px', background: 'rgba(0,0,0,0.5)', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>Remote</span>
                 </div>
               </div>
+            )}
+
+            {/* Voice Call Remote Audio Playback */}
+            {activeCall.type === 'voice' && activeCall.status === 'connected' && (
+              <audio ref={remoteVideoRef} autoPlay style={{ display: 'none' }} />
             )}
 
             {/* Control Actions Row */}
