@@ -365,7 +365,7 @@ io.on('connection', (socket) => {
 
   // --- WebRTC Peer-to-Peer Calls Signaling ---
   socket.on('call_user', async (data) => {
-    const { userToCall, signalData, fromUser, type, chatId } = data;
+    const { userToCall, signalData, fromUser, type, chatId, dbId } = data;
     
     try {
       // Block checks for calls
@@ -388,6 +388,7 @@ io.on('connection', (socket) => {
         from: fromUser,
         type,
         chatId,
+        dbId,
       });
     } catch (err) {
       console.error('Call block check error:', err);

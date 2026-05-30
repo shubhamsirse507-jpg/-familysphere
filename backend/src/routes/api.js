@@ -17,6 +17,7 @@ import {
 } from '../controllers/chatController.js';
 import { blockUser, unblockUser, getBlockedUsers } from '../controllers/userController.js';
 import { uploadMedia } from '../controllers/uploadController.js';
+import { createCallLog, updateCallLog, getCallHistory } from '../controllers/callController.js';
 import {
   createStory,
   getActiveStories,
@@ -58,6 +59,11 @@ router.get('/users/blocked', protect, getBlockedUsers);
 
 // --- Media Upload ---
 router.post('/upload', protect, uploadMedia);
+
+// --- Call Log Routes ---
+router.post('/calls', protect, createCallLog);
+router.put('/calls/:callId', protect, updateCallLog);
+router.get('/calls', protect, getCallHistory);
 
 // --- Story / Status Routes ---
 router.post('/stories', protect, createStory);
