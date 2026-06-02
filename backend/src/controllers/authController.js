@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User, Location, BlockedUser } from '../models/index.js';
+import { User, Location, BlockedUser, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
+import { sequelize } from '../config/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
 
@@ -49,6 +50,19 @@ export const signup = async (req, res) => {
       longitude: -73.968285 + (Math.random() - 0.5) * 0.015,
       isLive: true,
     });
+
+    // Auto-join new user to all family group chats
+    try {
+      const groupChats = await Chat.findAll({ where: { isGroup: true } });
+      for (const chat of groupChats) {
+        const isMember = await ChatMember.findOne({ where: { chatId: chat.id, userId: user.id } });
+        if (!isMember) {
+          await ChatMember.create({ chatId: chat.id, userId: user.id });
+        }
+      }
+    } catch (groupErr) {
+      console.warn('Could not auto-join group chat:', groupErr.message);
+    }
     
     res.status(201).json({
       id: user.id,
@@ -67,15 +81,25 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, email, password } = req.body;
+    const loginIdentifier = username || email;
     
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: 'Username or Email and password are required' });
     }
     
-    const user = await User.findOne({ where: { email } });
+    const lowerIdentifier = loginIdentifier.toLowerCase();
+    
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), lowerIdentifier),
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), lowerIdentifier)
+        ]
+      }
+    });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid username/email or password' });
     }
     
     const isMatch = await bcrypt.compare(password, user.passwordHash);
