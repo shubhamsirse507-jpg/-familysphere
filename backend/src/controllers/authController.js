@@ -280,7 +280,7 @@ export const updateProfile = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
-      token: generateToken(user),
+      token: generateToken(user, req.user.sessionId),
     });
   } catch (error) {
     console.error('Update profile error:', error);
