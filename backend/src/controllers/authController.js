@@ -1,9 +1,15 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { User, BlockedUser, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
 
@@ -13,6 +19,36 @@ const generateToken = (user, sessionId) => {
     JWT_SECRET,
     { expiresIn: '30d' }
   );
+};
+
+const appendUserToCSV = (name, phone, email, password, role, profilePhoto) => {
+  try {
+    const csvPath = path.resolve(__dirname, '../../../family_members.csv');
+    let content = '';
+    if (fs.existsSync(csvPath)) {
+      content = fs.readFileSync(csvPath, 'utf8');
+    } else {
+      content = 'Name,Phone,Email,Password,Role,ProfilePhoto\n';
+      fs.writeFileSync(csvPath, content, 'utf8');
+    }
+    
+    const suffix = (content.endsWith('\n') || content.endsWith('\r')) ? '' : '\n';
+    
+    const escapeCsv = (str) => {
+      if (!str) return '';
+      const stringified = String(str);
+      if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+        return `"${stringified.replace(/"/g, '""')}"`;
+      }
+      return stringified;
+    };
+    
+    const newLine = `${escapeCsv(name)},${escapeCsv(phone)},${escapeCsv(email)},${escapeCsv(password)},${escapeCsv(role)},${escapeCsv(profilePhoto || '')}\n`;
+    fs.appendFileSync(csvPath, suffix + newLine, 'utf8');
+    console.log(`[Developer Log] Appended user ${name} to family_members.csv`);
+  } catch (err) {
+    console.error('Error appending user to CSV:', err.message);
+  }
 };
 
 export const signup = async (req, res) => {
@@ -44,7 +80,8 @@ export const signup = async (req, res) => {
       profilePhoto: profilePhoto || null,
     });
     
-
+    // Automatically log the new user details in plain text to family_members.csv for developer visibility
+    appendUserToCSV(name, phone, email, password, role || 'Parent', profilePhoto);
 
     // Auto-join new user to all family group chats
     try {
