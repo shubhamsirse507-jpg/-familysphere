@@ -378,18 +378,7 @@ io.on('connection', (socket) => {
     socket.to(chatId).emit('typing', { chatId, userId, isTyping });
   });
 
-  // Live Location updating via WebSocket
-  socket.on('share_location', async (data) => {
-    const { userId, latitude, longitude } = data;
-    try {
-      await sequelize.query(
-        `UPDATE Locations SET latitude = ${latitude}, longitude = ${longitude}, isLive = 1, updatedAt = datetime('now') WHERE userId = '${userId}'`
-      );
-      socket.broadcast.emit('location_updated', { userId, latitude, longitude });
-    } catch (err) {
-      console.error('Location sync error:', err);
-    }
-  });
+
 
   // --- WebRTC Peer-to-Peer Calls Signaling ---
   socket.on('call_user', async (data) => {

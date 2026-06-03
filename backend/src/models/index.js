@@ -221,26 +221,7 @@ export const Call = sequelize.define('Call', {
   },
 });
 
-// --- Location Model (Live tracking) ---
-export const Location = sequelize.define('Location', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
-  },
-  latitude: {
-    type: DataTypes.DOUBLE,
-    allowNull: false,
-  },
-  longitude: {
-    type: DataTypes.DOUBLE,
-    allowNull: false,
-  },
-  isLive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-  },
-});
+
 
 // --- BlockedUser Model ---
 export const BlockedUser = sequelize.define('BlockedUser', {
@@ -311,9 +292,6 @@ Call.belongsTo(User, { as: 'receiver', foreignKey: 'receiverId' });
 Chat.hasMany(Call, { foreignKey: 'chatId', onDelete: 'CASCADE' });
 Call.belongsTo(Chat, { foreignKey: 'chatId' });
 
-// Locations
-User.hasOne(Location, { foreignKey: 'userId', onDelete: 'CASCADE' });
-Location.belongsTo(User, { foreignKey: 'userId' });
 
 // Blocked Users
 User.hasMany(BlockedUser, { as: 'blockedUsers', foreignKey: 'blockerId', onDelete: 'CASCADE' });

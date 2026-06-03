@@ -23,10 +23,7 @@ import {
   getActiveStories,
   viewStory,
 } from '../controllers/storyController.js';
-import {
-  updateLocation,
-  getFamilyLocations,
-} from '../controllers/locationController.js';
+
 import {
   getSmartReplies,
   translateMessage,
@@ -70,9 +67,7 @@ router.post('/stories', protect, createStory);
 router.get('/stories', protect, getActiveStories);
 router.post('/stories/view', protect, viewStory);
 
-// --- Location Routes ---
-router.post('/location', protect, updateLocation);
-router.get('/location/family', protect, getFamilyLocations);
+
 
 // --- AI Routes ---
 router.post('/ai/smart-replies', protect, getSmartReplies);

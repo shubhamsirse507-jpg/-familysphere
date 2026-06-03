@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { 
-  MessageSquare, MapPin, Phone, Camera, Brain, Sparkles, Plus, 
+  MessageSquare, Phone, Camera, Brain, Sparkles, Plus, 
   Search, Send, MoreVertical, Paperclip, Smile, Mic, Volume2, 
   Video, PhoneOff, Pin, UserPlus, Menu, Sun, Moon, LogOut, 
   Settings, Globe, ShieldAlert, Trash2, Check, CheckCheck, Eye, 
-  X, Info, Map, ChevronRight, BarChart2, ShieldCheck, HelpCircle,
+  X, Info, ChevronRight, BarChart2, ShieldCheck, HelpCircle,
   Image, Users, Heart, Share2, MessageCircle, Lock, EyeOff, CheckSquare, Bell, Cloud, Award
 } from 'lucide-react';
 
@@ -23,7 +23,7 @@ const resolveMediaUrl = (url) => {
 export default function App() {
   // --- UI & Styling State ---
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  const [activeTab, setActiveTab] = useState('chats'); // 'chats', 'status', 'map', 'calls', 'ai'
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats', 'status', 'calls', 'ai'
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberForm, setAddMemberForm] = useState({ name: '', phone: '', email: '', password: '', role: 'Parent', profilePhoto: '' });
   const [addMemberError, setAddMemberError] = useState('');
@@ -81,10 +81,6 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
-
-  // --- Location / Map State ---
-  const [locations, setLocations] = useState([]);
-  const [shareLocationActive, setShareLocationActive] = useState(true);
 
   // --- AI Settings State ---
   const [aiAssistantLogs, setAiAssistantLogs] = useState([
@@ -145,13 +141,11 @@ export default function App() {
     bio: 'Family member. Always here for the team. 🏡❤️',
     customStatus: 'Connected with the family 💬',
     handle: '@familysphere_user',
-    allowLocationTracking: true,
     allowOnlinePresence: true,
     allowTimelinePosts: true,
     notificationDMs: true,
     notificationGroupTags: true,
     notificationLikes: true,
-    notificationTrackerAlerts: true,
     mediaHD: true,
     cloudStorageLimit: 50, // GB
     cloudStorageUsed: 12.4 // GB
@@ -161,8 +155,6 @@ export default function App() {
   // --- Refs ---
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const mapContainerRef = useRef(null);
-  const leafletMapRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const callTimerIntervalRef = useRef(null);
@@ -170,9 +162,6 @@ export default function App() {
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
   const pendingSignalRef = useRef(null);
-  const locationsRef = useRef(locations);
-  const shareLocationActiveRef = useRef(shareLocationActive);
-  const allowLocationTrackingRef = useRef(settingsForm.allowLocationTracking);
 
   // ==========================================================================
   // Lifecycle & Synchronization
@@ -184,18 +173,7 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  useEffect(() => {
-    locationsRef.current = locations;
-  }, [locations]);
 
-  useEffect(() => {
-    shareLocationActiveRef.current = shareLocationActive;
-  }, [shareLocationActive]);
-
-  useEffect(() => {
-    allowLocationTrackingRef.current = settingsForm.allowLocationTracking;
-    setShareLocationActive(settingsForm.allowLocationTracking);
-  }, [settingsForm.allowLocationTracking]);
 
   // Load User profile if token exists
   useEffect(() => {
@@ -217,35 +195,12 @@ export default function App() {
       // Load tabs data
       fetchChats();
       fetchStories();
-      fetchLocations();
       fetchUsersList();
       fetchBlockedUsers();
       fetchCallHistory();
 
-      // Setup simulated location sharing loop
-      const locationInterval = setInterval(() => {
-        if (shareLocationActiveRef.current && allowLocationTrackingRef.current && socketRef.current) {
-          // Send simulated minor GPS shifts to make map feel alive
-          const currentLoc = locationsRef.current.find(l => l.userId === user.id);
-          if (currentLoc) {
-            const shiftLat = (Math.random() - 0.5) * 0.0008;
-            const shiftLng = (Math.random() - 0.5) * 0.0008;
-            const nextLat = currentLoc.latitude + shiftLat;
-            const nextLng = currentLoc.longitude + shiftLng;
-            
-            socketRef.current.emit('share_location', {
-              userId: user.id,
-              latitude: nextLat,
-              longitude: nextLng
-            });
-          }
-        }
-      }, 10000);
-
       return () => {
-        clearInterval(locationInterval);
         if (socketRef.current) socketRef.current.disconnect();
-        cleanupLeafletMap();
       };
     }
   }, [user]);
@@ -298,18 +253,7 @@ export default function App() {
     return () => clearInterval(callTimerIntervalRef.current);
   }, [activeCall]);
 
-  // Render Leaflet map when Location tab active
-  useEffect(() => {
-    if (activeTab === 'map' && locations.length > 0) {
-      renderMap();
-    } else if (activeTab !== 'map') {
-      cleanupLeafletMap();
-    }
-  }, [activeTab, locations]);
 
-  useEffect(() => {
-    return () => cleanupLeafletMap();
-  }, []);
 
   // Handles camera streams for active call overlay
   useEffect(() => {
@@ -393,13 +337,7 @@ export default function App() {
       });
     });
 
-    // Real-time Location updates
-    socket.on('location_updated', (data) => {
-      const { userId, latitude, longitude } = data;
-      setLocations(prev => prev.map(loc => 
-        loc.userId === userId ? { ...loc, latitude, longitude } : loc
-      ));
-    });
+
 
     // Live active users count
     socket.on('active_users_update', (data) => {
@@ -588,19 +526,7 @@ export default function App() {
     }
   };
 
-  const fetchLocations = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/location/family`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLocations(data);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+
 
   const fetchUsersList = async () => {
     try {
@@ -1419,80 +1345,7 @@ export default function App() {
     }
   };
 
-  // ==========================================================================
-  // Live GPS Interactive Leaflet Map
-  // ==========================================================================
 
-  const cleanupLeafletMap = () => {
-    if (leafletMapRef.current) {
-      try {
-        leafletMapRef.current.remove();
-      } catch (e) {
-        console.warn('Leaflet map cleanup failed:', e);
-      }
-      leafletMapRef.current = null;
-    }
-  };
-
-  const renderMap = () => {
-    // Check if Leaflet window instance exists
-    if (!window.L) {
-      console.warn('Leaflet map library is currently unavailable.');
-      return;
-    }
-
-    const container = mapContainerRef.current;
-    if (!container) return;
-    const mapNode = container.querySelector('#leaflet-map');
-    if (!mapNode) return;
-
-    cleanupLeafletMap();
-
-    // Setup map (centered around central park base)
-    const map = window.L.map(mapNode).setView([40.785091, -73.968285], 14);
-    leafletMapRef.current = map;
-
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Plot each family member marker
-    locations.forEach(loc => {
-      if (!loc.User) return;
-      
-      // Generate a custom circular profile marker HTML
-      const markerHtml = `
-        <div style="
-          width: 46px; 
-          height: 46px; 
-          border-radius: 50%; 
-          border: 3px solid ${loc.User.role === 'Parent' ? '#6366f1' : '#10b981'}; 
-          overflow: hidden; 
-          background: #fff;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-          transform: translate(-10px, -10px);
-        ">
-          <img src="${loc.User.profilePhoto || 'https://via.placeholder.com/150'}" style="width:100%; height:100%; object-fit:cover;" />
-        </div>
-      `;
-
-      const customIcon = window.L.divIcon({
-        html: markerHtml,
-        className: 'custom-map-icon',
-        iconSize: [46, 46],
-        iconAnchor: [23, 23]
-      });
-
-      window.L.marker([loc.latitude, loc.longitude], { icon: customIcon })
-        .addTo(map)
-        .bindPopup(`
-          <div style="font-family: Outfit; font-size:13px; text-align:center;">
-            <b>${loc.User.name}</b><br/>
-            <span style="color:#64748b; font-size:11px;">Role: ${loc.User.role}</span>
-          </div>
-        `);
-    });
-  };
 
   // ==========================================================================
   // AI Assistant Tab Console
@@ -2100,18 +1953,7 @@ export default function App() {
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Share Live GPS Coordinate Location</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Allow family members to see your live position on the Tracker Map.</div>
-                </div>
-                <input 
-                  type="checkbox" 
-                  checked={settingsForm.allowLocationTracking} 
-                  onChange={() => setSettingsForm({ ...settingsForm, allowLocationTracking: !settingsForm.allowLocationTracking })} 
-                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                />
-              </div>
+
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-glass)' }}>
                 <div>
@@ -2247,18 +2089,7 @@ export default function App() {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>Tracker Proximity Alerts</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Notify when family members enter or exit coordinate geofence bounds.</div>
-                </div>
-                <input 
-                  type="checkbox" 
-                  checked={settingsForm.notificationTrackerAlerts} 
-                  onChange={() => setSettingsForm({ ...settingsForm, notificationTrackerAlerts: !settingsForm.notificationTrackerAlerts })} 
-                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                />
-              </div>
+
             </div>
           </div>
         )}
@@ -2594,37 +2425,7 @@ export default function App() {
             </div>
           )}
 
-          {/* C. MAP TAB (Live GPS Locations) */}
-          {activeTab === 'map' && (
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-              <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', marginBottom: '6px' }}>Live Family Tracker</h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Tracks current coordinates of family members dynamically.</p>
-              </div>
 
-              {/* List of members locations */}
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                {locations.map(loc => (
-                  <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border-glass)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                      <img src={loc.User?.profilePhoto || 'https://via.placeholder.com/150'} className="avatar sm" />
-                      <div>
-                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{loc.User?.name} ({loc.User?.role})</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Lat: {loc.latitude.toFixed(6)}, Lng: {loc.longitude.toFixed(6)}</div>
-                      </div>
-                    </div>
-                    <span style={{
-                      fontSize: '11px', padding: '4px 8px', borderRadius: '8px',
-                      background: loc.isLive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)',
-                      color: loc.isLive ? 'var(--color-success)' : 'var(--text-secondary)'
-                    }}>
-                      {loc.isLive ? 'Live Now' : 'Offline'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* D. CALLS TAB */}
           {activeTab === 'calls' && (
@@ -3080,10 +2881,7 @@ export default function App() {
             <Users size={20} />
             <span>Circles</span>
           </button>
-          <button className={`nav-btn ${activeTab === 'map' ? 'active' : ''}`} onClick={() => { setActiveTab('map'); setActiveChat(null); }}>
-            <Map size={20} />
-            <span>Tracker</span>
-          </button>
+
           <button className={`nav-btn ${activeTab === 'calls' ? 'active' : ''}`} onClick={() => { setActiveTab('calls'); setActiveChat(null); }}>
             <Phone size={20} />
             <span>Calls</span>
@@ -3513,36 +3311,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ==========================================================================
-         4. Location Tracker Leaflet Map Modal Canvas (Rendered when Tab active)
-         ========================================================================== */}
-      {activeTab === 'map' && (
-        <div 
-          ref={mapContainerRef} 
-          style={{
-            flex: 1, 
-            height: '100%', 
-            background: 'var(--bg-tertiary)',
-            position: 'relative'
-          }}
-        >
-          <div id="leaflet-map" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2 }} />
-          {/* Dynamic SVG Fallback in case Leaflet fails or runs offline */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '40px', zIndex: 1,
-            opacity: locations.length > 0 && window.L ? 0 : 1,
-            pointerEvents: locations.length > 0 && window.L ? 'none' : 'auto'
-          }}>
-            <Map size={48} style={{ color: 'var(--color-primary)', marginBottom: '16px' }} />
-            <h4 style={{ fontFamily: 'Outfit', fontSize: '16px' }}>Interactive Location Tracker</h4>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '4px' }}>
-              (Integrating Leaflet OpenStreetMap layers. Move to this tab to render standard maps.)
-            </p>
-          </div>
-        </div>
-      )}
+
 
       {/* ==========================================================================
          5. Status / Story Viewer Fullscreen Modal

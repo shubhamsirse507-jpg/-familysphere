@@ -3,7 +3,7 @@ import path from 'path';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { connectDB, sequelize } from './config/db.js';
-import { User, Chat, ChatMember, Message, Location, Story, PollOption } from './models/index.js';
+import { User, Chat, ChatMember, Message, Story, PollOption } from './models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,9 +79,6 @@ export const runSeeding = async (force = true) => {
     }
 
     const createdUsers = [];
-    // Base coordinate for the live map (New York Central Park area)
-    const baseLat = 40.785091;
-    const baseLng = -73.968285;
 
     for (let i = 0; i < parsedData.length; i++) {
       const item = parsedData[i];
@@ -99,15 +96,7 @@ export const runSeeding = async (force = true) => {
       console.log(`Created user: ${user.name} (${user.role})`);
       createdUsers.push(user);
 
-      // Create a default location nearby the base location for the interactive map
-      const latOffset = (Math.random() - 0.5) * 0.015;
-      const lngOffset = (Math.random() - 0.5) * 0.015;
-      await Location.create({
-        userId: user.id,
-        latitude: baseLat + latOffset,
-        longitude: baseLng + lngOffset,
-        isLive: true,
-      });
+
     }
 
     // Create a general Family Group Chat

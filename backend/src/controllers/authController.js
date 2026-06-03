@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { User, Location, BlockedUser, Chat, ChatMember } from '../models/index.js';
+import { User, BlockedUser, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/db.js';
 
@@ -44,13 +44,7 @@ export const signup = async (req, res) => {
       profilePhoto: profilePhoto || null,
     });
     
-    // Create base location coordinates
-    await Location.create({
-      userId: user.id,
-      latitude: 40.785091 + (Math.random() - 0.5) * 0.015,
-      longitude: -73.968285 + (Math.random() - 0.5) * 0.015,
-      isLive: true,
-    });
+
 
     // Auto-join new user to all family group chats
     try {
