@@ -743,10 +743,20 @@ export default function App() {
         body: JSON.stringify(requestBody)
       });
       
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        setAuthError('Server returned an invalid response. Please check your backend connection.');
+        return;
+      }
       
       if (!res.ok) {
-        setAuthError(data.error || 'Authentication failed');
+        const errMsg = typeof data?.error === 'string' ? data.error
+                     : typeof data?.message === 'string' ? data.message
+                     : typeof data?.error === 'object' ? JSON.stringify(data.error)
+                     : 'Authentication failed';
+        setAuthError(errMsg);
         return;
       }
       
@@ -3569,9 +3579,19 @@ export default function App() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(addMemberForm)
                 });
-                const data = await res.json();
+                let data;
+                try {
+                  data = await res.json();
+                } catch (parseErr) {
+                  setAddMemberError('Server returned an invalid response.');
+                  return;
+                }
                 if (!res.ok) {
-                  setAddMemberError(data.error || 'Failed to create account');
+                  const errMsg = typeof data?.error === 'string' ? data.error
+                               : typeof data?.message === 'string' ? data.message
+                               : typeof data?.error === 'object' ? JSON.stringify(data.error)
+                               : 'Failed to create account';
+                  setAddMemberError(errMsg);
                   return;
                 }
                 setAddMemberSuccess(`✅ ${addMemberForm.name} has been added! They can now log in with ${addMemberForm.email}.`);
