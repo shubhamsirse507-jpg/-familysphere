@@ -82,38 +82,55 @@ export const runSeeding = async (force = true) => {
 
     for (let i = 0; i < parsedData.length; i++) {
       const item = parsedData[i];
-      const passwordHash = await bcrypt.hash(item.Password || 'Password123', 10);
-      
-      const user = await User.create({
-        name: item.Name,
-        phone: item.Phone,
-        email: item.Email,
-        passwordHash,
-        role: item.Role || 'Parent',
-        profilePhoto: item.ProfilePhoto || null,
-      });
+      if (!item.Email) continue;
 
-      console.log(`Created user: ${user.name} (${user.role})`);
+      let user = await User.findOne({ where: { email: item.Email } });
+      if (user) {
+        // Update user fields without changing password (since user exists)
+        user.name = item.Name || user.name;
+        user.phone = item.Phone || user.phone;
+        user.role = item.Role || user.role;
+        user.profilePhoto = item.ProfilePhoto || user.profilePhoto;
+        await user.save();
+        console.log(`Updated existing user from CSV: ${user.name} (${user.role})`);
+      } else {
+        // Create new user
+        const passwordHash = await bcrypt.hash(item.Password || 'Password123', 10);
+        user = await User.create({
+          name: item.Name,
+          phone: item.Phone,
+          email: item.Email,
+          passwordHash,
+          role: item.Role || 'Parent',
+          profilePhoto: item.ProfilePhoto || null,
+        });
+        console.log(`Created new user from CSV: ${user.name} (${user.role})`);
+      }
       createdUsers.push(user);
-
-
     }
 
-    // Create a general Family Group Chat
-    const familyGroup = await Chat.create({
-      name: 'The Family Sphere 🏡',
-      isGroup: true,
-      avatar: 'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?w=150', // family photo placeholder
-    });
-
-    // Add all members to the group chat
-    for (const user of createdUsers) {
-      await ChatMember.create({
-        chatId: familyGroup.id,
-        userId: user.id,
+    // Get or create general Family Group Chat
+    let familyGroup = await Chat.findOne({ where: { name: 'The Family Sphere 🏡', isGroup: true } });
+    if (!familyGroup) {
+      familyGroup = await Chat.create({
+        name: 'The Family Sphere 🏡',
+        isGroup: true,
+        avatar: 'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?w=150',
       });
+      console.log('Created Family Group Chat.');
     }
-    console.log('Created Family Group Chat and joined all members.');
+
+    // Add all members to the group chat if not already members
+    for (const user of createdUsers) {
+      const isMember = await ChatMember.findOne({ where: { chatId: familyGroup.id, userId: user.id } });
+      if (!isMember) {
+        await ChatMember.create({
+          chatId: familyGroup.id,
+          userId: user.id,
+        });
+        console.log(`Added user ${user.name} to Family Group Chat.`);
+      }
+    }
 
     // Seed some mock conversation history using first 3 users
     const [user1, user2, user3] = createdUsers;

@@ -469,15 +469,14 @@ const startServer = async () => {
     // Connect SQLite DB
     await connectDB();
     
-    // Auto sync tables (do not force erase if file exists, keeping current data)
-    // Only force sync and seed if DB file does not exist or we run seed script
-    const forceSeed = !fs.existsSync(path.resolve(__dirname, '../database.sqlite'));
-    if (forceSeed) {
-      console.log('Database file not found. Running seed script with CSV import...');
+    // Auto sync tables and run incremental seed from CSV to sync any missing users
+    const dbExists = fs.existsSync(path.resolve(__dirname, '../database.sqlite'));
+    if (!dbExists) {
+      console.log('Database file not found. Running seed script with full CSV import...');
       await runSeeding(true);
     } else {
-      await sequelize.sync();
-      console.log('Database synced without forcing seed.');
+      console.log('Database file exists. Syncing tables and running incremental CSV sync...');
+      await runSeeding(false);
     }
 
     // Clear old calls history to ensure no references to removed users (Mom, Dad, Son) remain
