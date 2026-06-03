@@ -13,6 +13,8 @@ import { connectDB, sequelize } from './config/db.js';
 import apiRoutes from './routes/api.js';
 import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, MessageStatus } from './models/index.js';
 import { runSeeding } from './seed.js';
+import { requireAdmin } from './middleware/adminAuth.js';
+import { showLogin, processLogin, logout, showDashboard, downloadCSV } from './controllers/adminController.js';
 
 dotenv.config();
 
@@ -65,6 +67,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Setup API Routes
 app.use('/api', apiRoutes);
+
+// =======================================================
+// Admin Dashboard Routes (Developer-Only, Password Protected)
+// =======================================================
+app.get('/admin', (req, res) => res.redirect('/admin/login'));
+app.get('/admin/login', showLogin);
+app.post('/admin/login', processLogin);
+app.get('/admin/logout', logout);
+app.get('/admin/dashboard', requireAdmin, showDashboard);
+app.get('/admin/download', requireAdmin, downloadCSV);
 
 // Server static files (e.g. for uploads or frontend builds)
 app.use(express.static(path.join(__dirname, '../public')));
