@@ -33,13 +33,24 @@ const io = new Server(server, {
 const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
 
 // Socket.io JWT Authentication Middleware
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
   if (!token) {
     return next();
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Verify session is still active (single-device enforcement)
+    if (decoded.sessionId) {
+      const user = await User.findByPk(decoded.id, {
+        attributes: ['id', 'activeSessionId']
+      });
+      if (!user || user.activeSessionId !== decoded.sessionId) {
+        return next(new Error('Session replaced by another device'));
+      }
+    }
+    
     socket.user = decoded;
     next();
   } catch (err) {
@@ -92,6 +103,22 @@ const ensureAIUser = async () => {
   }
 };
 
+// Broadcast live active user count to all connected clients
+const broadcastActiveUsers = async () => {
+  try {
+    const activeUsers = await User.findAll({
+      where: { isOnline: true },
+      attributes: ['id', 'name', 'role', 'profilePhoto'],
+    });
+    io.emit('active_users_update', {
+      count: activeUsers.length,
+      users: activeUsers.map(u => u.toJSON()),
+    });
+  } catch (err) {
+    console.error('Error broadcasting active users:', err);
+  }
+};
+
 // Real-time communication via Socket.io
 io.on('connection', (socket) => {
   // console.log(`Socket connected: ${socket.id}`);
@@ -104,6 +131,7 @@ io.on('connection', (socket) => {
     try {
       await User.update({ isOnline: true, lastSeen: null }, { where: { id: userId } });
       io.emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
+      await broadcastActiveUsers();
     } catch (err) {
       console.error('Error updating user online status:', err);
     }
@@ -285,9 +313,9 @@ io.on('connection', (socket) => {
           if (lowerPrompt.includes('dinner') || lowerPrompt.includes('recipe') || lowerPrompt.includes('eat')) {
             aiReplyContent = "🍽️ **Dinner Suggestion:** How about a healthy taco night? It's interactive and fun for kids and grandparents alike! You will need:\n- Tortillas\n- Ground beef or black beans\n- Avocados, tomatoes, and salsa\n- Cheese and sour cream\nWould you like me to make a shopping list for this? 🛒";
           } else if (lowerPrompt.includes('chore') || lowerPrompt.includes('clean') || lowerPrompt.includes('task')) {
-            aiReplyContent = "🧹 **Family Chore Organizer:** I recommend setting up a weekly rotation system. For example:\n- **Mom/Dad:** Kitchen duty & cooking\n- **Kids:** Taking out trash & setting the table\n- **Grandparents:** Feeding pets & folding laundry\nI can create a visual chart or send reminders to keep everyone on track! Would you like me to help draft a chore calendar?";
+            aiReplyContent = "🧹 **Family Chore Organizer:** I recommend setting up a weekly rotation system. For example:\n- **Samiksha:** Kitchen duty & grocery shopping\n- **Varsha:** Cleaning & organizing living spaces\n- **Vijay:** Outdoor tasks & maintenance\n- **Host:** Coordinating schedules & reminders\nI can create a visual chart or send reminders to keep everyone on track! Would you like me to help draft a chore calendar?";
           } else if (lowerPrompt.includes('schedule') || lowerPrompt.includes('event') || lowerPrompt.includes('calendar')) {
-            aiReplyContent = "📅 **Schedule Helper:** I see we have Mom's grocery trip and Grandma's birthday coming up. I can set automatic alerts inside our family group chat to keep everyone aligned! Let me know what event you would like to schedule next.";
+            aiReplyContent = "📅 **Schedule Helper:** I can track upcoming events for Samiksha, Varsha, Vijay, and Host. I can set automatic alerts inside our family group chat to keep everyone aligned! Let me know what event you would like to schedule next.";
           } else if (lowerPrompt.includes('joke')) {
             aiReplyContent = "😄 Here is a family-friendly joke:\n\n*Why did the computer go to the doctor?*\n*Because it had a virus!* 💻🩺";
           } else if (lowerPrompt.includes('help') || lowerPrompt.includes('capabilities')) {
@@ -424,6 +452,7 @@ io.on('connection', (socket) => {
           const lastSeen = new Date();
           await User.update({ isOnline: false, lastSeen }, { where: { id: userId } });
           io.emit('user_status_changed', { userId, isOnline: false, lastSeen });
+          await broadcastActiveUsers();
         }
       } catch (err) {
         console.error('Error on disconnect presence update:', err);
@@ -448,6 +477,14 @@ const startServer = async () => {
     } else {
       await sequelize.sync();
       console.log('Database synced without forcing seed.');
+    }
+
+    // Clear old calls history to ensure no references to removed users (Mom, Dad, Son) remain
+    try {
+      await sequelize.query('DELETE FROM Calls');
+      console.log('✅ All old call history cleared from database on startup.');
+    } catch (callClearErr) {
+      console.error('Error clearing old calls:', callClearErr);
     }
     
     // Ensure AI profile is in DB

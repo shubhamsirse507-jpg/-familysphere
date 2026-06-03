@@ -38,6 +38,9 @@ export default function App() {
   });
   const [authError, setAuthError] = useState('');
 
+  // --- Active Users State ---
+  const [activeUsers, setActiveUsers] = useState({ count: 0, users: [] });
+
   // --- Chat State ---
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -68,15 +71,16 @@ export default function App() {
 
   // --- Calling State (WebRTC & Loopback simulation) ---
   const [activeCall, setActiveCall] = useState(null); // { id, caller, receiver, type, status: 'ringing'|'connected'|'ended' }
+  const activeCallRef = useRef(null);
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
   const [callTimer, setCallTimer] = useState(0);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
-  const [callHistory, setCallHistory] = useState([
-    { id: 1, type: 'video', status: 'completed', duration: '14 mins', date: 'Yesterday, 8:45 PM', partner: 'Jane Doe (Mom)' },
-    { id: 2, type: 'voice', status: 'missed', duration: '-', date: 'May 28, 2:15 PM', partner: 'Billy Doe (Son)' }
-  ]);
+  const [callHistory, setCallHistory] = useState([]);
 
   // --- Location / Map State ---
   const [locations, setLocations] = useState([]);
@@ -94,21 +98,21 @@ export default function App() {
   const [feedPosts, setFeedPosts] = useState([
     {
       id: 1,
-      sender: { name: 'Jane Doe (Mom)', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150' },
-      content: 'Sunday Dinner is locked in! Making roast chicken and mashed potatoes. Let me know if you want any specific sides! 🍗🥔',
+      sender: { name: 'Samiksha', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
+      content: 'Sunday Dinner is locked in! Making dal makhani and jeera rice. Let me know if you want any specific sides! 🍛🥘',
       image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600',
       likes: 4,
       likedByMe: true,
       comments: [
-        { id: 1, sender: 'Billy Doe (Son)', content: 'Can we get garlic bread please?? 🙏' },
-        { id: 2, sender: 'Dad', content: 'Count me in, sounds delicious!' }
+        { id: 1, sender: 'Varsha', content: 'Can we add some papad please?? 🙏' },
+        { id: 2, sender: 'Vijay', content: 'Count me in, sounds delicious!' }
       ],
       createdAt: '2 hours ago'
     },
     {
       id: 2,
-      sender: { name: 'Dad', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
-      content: 'Finally mowed the back lawn! Circles group "Sunday Outings" - please check the scheduled poll for our upcoming hiking trip details. ☀️🏃‍♂️',
+      sender: { name: 'Vijay', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
+      content: 'Finally set up the new garden area! Check the "Sunday Outings" group for our upcoming weekend trip poll. ☀️🏃‍♂️',
       image: null,
       likes: 2,
       likedByMe: false,
@@ -120,10 +124,10 @@ export default function App() {
   const [newPostImage, setNewPostImage] = useState('');
 
   const [sharedPhotos, setSharedPhotos] = useState([
-    { id: 1, title: 'Summer Vacation 2025', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500', uploader: 'Jane Doe (Mom)', date: 'June 15, 2025' },
-    { id: 2, title: 'Son Graduation Day 🎓', url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=500', uploader: 'Dad', date: 'May 12, 2026' },
-    { id: 3, title: 'Sunday Picnic', url: 'https://images.unsplash.com/photo-1526218626217-dc65a29bb444?w=500', uploader: 'Billy Doe (Son)', date: '2 weeks ago' },
-    { id: 4, title: 'Gardening Projects 🌻', url: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=500', uploader: 'Jane Doe (Mom)', date: '3 days ago' }
+    { id: 1, title: 'Summer Vacation 2025 🌊', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500', uploader: 'Samiksha', date: 'June 15, 2025' },
+    { id: 2, title: 'Family Celebration 🎉', url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=500', uploader: 'Vijay', date: 'May 12, 2026' },
+    { id: 3, title: 'Sunday Picnic 🧺', url: 'https://images.unsplash.com/photo-1526218626217-dc65a29bb444?w=500', uploader: 'Varsha', date: '2 weeks ago' },
+    { id: 4, title: 'Garden Projects 🌻', url: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=500', uploader: 'Samiksha', date: '3 days ago' }
   ]);
   const [newMemoryTitle, setNewMemoryTitle] = useState('');
   const [newMemoryUrl, setNewMemoryUrl] = useState('');
@@ -138,9 +142,9 @@ export default function App() {
 
   // --- Granular Settings Toggles ---
   const [settingsForm, setSettingsForm] = useState({
-    bio: 'Proud Parent. Coordinator of the weekly family schedules. 🏡❤️',
-    customStatus: 'Coding a new website... 💻',
-    handle: '@mom_coordinates',
+    bio: 'Family member. Always here for the team. 🏡❤️',
+    customStatus: 'Connected with the family 💬',
+    handle: '@familysphere_user',
     allowLocationTracking: true,
     allowOnlinePresence: true,
     allowTimelinePosts: true,
@@ -158,6 +162,7 @@ export default function App() {
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const mapContainerRef = useRef(null);
+  const leafletMapRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const callTimerIntervalRef = useRef(null);
@@ -165,6 +170,9 @@ export default function App() {
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
   const pendingSignalRef = useRef(null);
+  const locationsRef = useRef(locations);
+  const shareLocationActiveRef = useRef(shareLocationActive);
+  const allowLocationTrackingRef = useRef(settingsForm.allowLocationTracking);
 
   // ==========================================================================
   // Lifecycle & Synchronization
@@ -175,6 +183,19 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    locationsRef.current = locations;
+  }, [locations]);
+
+  useEffect(() => {
+    shareLocationActiveRef.current = shareLocationActive;
+  }, [shareLocationActive]);
+
+  useEffect(() => {
+    allowLocationTrackingRef.current = settingsForm.allowLocationTracking;
+    setShareLocationActive(settingsForm.allowLocationTracking);
+  }, [settingsForm.allowLocationTracking]);
 
   // Load User profile if token exists
   useEffect(() => {
@@ -199,12 +220,13 @@ export default function App() {
       fetchLocations();
       fetchUsersList();
       fetchBlockedUsers();
+      fetchCallHistory();
 
       // Setup simulated location sharing loop
       const locationInterval = setInterval(() => {
-        if (shareLocationActive && socketRef.current) {
+        if (shareLocationActiveRef.current && allowLocationTrackingRef.current && socketRef.current) {
           // Send simulated minor GPS shifts to make map feel alive
-          const currentLoc = locations.find(l => l.userId === user.id);
+          const currentLoc = locationsRef.current.find(l => l.userId === user.id);
           if (currentLoc) {
             const shiftLat = (Math.random() - 0.5) * 0.0008;
             const shiftLng = (Math.random() - 0.5) * 0.0008;
@@ -223,6 +245,7 @@ export default function App() {
       return () => {
         clearInterval(locationInterval);
         if (socketRef.current) socketRef.current.disconnect();
+        cleanupLeafletMap();
       };
     }
   }, [user]);
@@ -279,12 +302,23 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'map' && locations.length > 0) {
       renderMap();
+    } else if (activeTab !== 'map') {
+      cleanupLeafletMap();
     }
   }, [activeTab, locations]);
 
+  useEffect(() => {
+    return () => cleanupLeafletMap();
+  }, []);
+
   // Handles camera streams for active call overlay
   useEffect(() => {
-    if (activeCall && activeCall.status === 'connected') {
+    const shouldSetupMedia = activeCall && (
+      activeCall.status === 'connected' ||
+      (activeCall.status === 'ringing' && activeCall.caller?.id === user?.id)
+    );
+
+    if (shouldSetupMedia) {
       setupMediaStreams();
     } else {
       stopMediaStreams();
@@ -367,9 +401,14 @@ export default function App() {
       ));
     });
 
+    // Live active users count
+    socket.on('active_users_update', (data) => {
+      setActiveUsers(data);
+    });
+
     // WebRTC Signaling
     socket.on('incoming_call', async (data) => {
-      const { from, signal, type, chatId } = data;
+      const { from, signal, type, chatId, dbId } = data;
       
       if (signal && signal.type === 'offer') {
         pendingSignalRef.current = signal;
@@ -382,7 +421,7 @@ export default function App() {
               toUser: from.id,
               signalData: answer
             });
-            return; // Return early: we are already connected, do not reset to ringing
+            return;
           } catch (e) {
             console.error('Error handling WebRTC offer:', e);
           }
@@ -390,7 +429,6 @@ export default function App() {
       }
 
       setActiveCall(prev => {
-        // If we are already connected or ringing, do not reset the state or restart the ringtone
         if (prev && (prev.status === 'connected' || prev.status === 'ringing')) {
           return prev;
         }
@@ -401,7 +439,8 @@ export default function App() {
           receiver: user,
           type,
           status: 'ringing',
-          signal
+          signal,
+          dbId
         };
       });
     });
@@ -410,11 +449,16 @@ export default function App() {
       stopRingtone();
       setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
       
+      if (activeCallRef.current && activeCallRef.current.dbId) {
+        logCallUpdate(activeCallRef.current.dbId, 'connected');
+      }
+
       if (signalData && signalData.type === 'answer') {
         pendingSignalRef.current = signalData;
         if (peerConnectionRef.current) {
           try {
             await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signalData));
+            pendingSignalRef.current = null;
           } catch (e) {
             console.error('Error setting remote answer:', e);
           }
@@ -435,10 +479,17 @@ export default function App() {
 
     socket.on('call_declined', () => {
       stopRingtone();
+      if (activeCallRef.current && activeCallRef.current.dbId) {
+        logCallUpdate(activeCallRef.current.dbId, 'declined');
+      }
       cleanupCallState();
     });
 
     socket.on('call_ended', () => {
+      if (activeCallRef.current && activeCallRef.current.dbId) {
+        const finalStatus = activeCallRef.current.status === 'connected' ? 'completed' : 'missed';
+        logCallUpdate(activeCallRef.current.dbId, finalStatus);
+      }
       cleanupCallState();
     });
   };
@@ -471,11 +522,28 @@ export default function App() {
         const data = await res.json();
         setUser(data);
       } else {
-        handleLogout();
+        const data = await res.json().catch(() => ({}));
+        if (data.code === 'SESSION_REPLACED') {
+          handleLogout('⚠️ You have been logged out because your account was signed in on another device.');
+        } else {
+          handleLogout();
+        }
       }
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // Helper: check if any API response indicates session was replaced
+  const checkSessionKicked = async (res) => {
+    if (res.status === 401) {
+      const data = await res.clone().json().catch(() => ({}));
+      if (data.code === 'SESSION_REPLACED') {
+        handleLogout('⚠️ You have been logged out because your account was signed in on another device.');
+        return true;
+      }
+    }
+    return false;
   };
 
   const fetchChats = async () => {
@@ -654,6 +722,63 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
+  const fetchCallHistory = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/calls`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCallHistory(data);
+      }
+    } catch (err) {
+      console.error('Fetch call history error:', err);
+    }
+  };
+
+  const logCallStart = async (receiverId, type, status = 'ringing', chatId = null) => {
+    try {
+      const res = await fetch(`${API_BASE}/calls`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ receiverId, type, status, chatId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fetchCallHistory();
+        return data;
+      }
+    } catch (err) {
+      console.error('Log call start error:', err);
+    }
+    return null;
+  };
+
+  const logCallUpdate = async (callDbId, status) => {
+    if (!callDbId) return null;
+    try {
+      const res = await fetch(`${API_BASE}/calls/${callDbId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fetchCallHistory();
+        return data;
+      }
+    } catch (err) {
+      console.error('Log call update error:', err);
+    }
+    return null;
+  };
+
   const fetchSmartReplies = async (content) => {
     try {
       const res = await fetch(`${API_BASE}/ai/smart-replies`, {
@@ -681,12 +806,15 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     const endpoint = authMode === 'login' ? 'login' : 'signup';
+    const requestBody = authMode === 'login'
+      ? { username: authForm.name, password: authForm.password }
+      : authForm;
     
     try {
       const res = await fetch(`${API_BASE}/auth/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
+        body: JSON.stringify(requestBody)
       });
       
       const data = await res.json();
@@ -704,12 +832,15 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = (reason) => {
     localStorage.removeItem('token');
     setToken('');
     setUser(null);
     setActiveChat(null);
     setMessages([]);
+    if (reason) {
+      setTimeout(() => alert(reason), 100);
+    }
   };
 
   // ==========================================================================
@@ -734,7 +865,9 @@ export default function App() {
     if (!customText) setInputText('');
     
     // Stop typing state
-    socketRef.current.emit('typing', { chatId: activeChat.id, userId: user.id, isTyping: false });
+    if (socketRef.current) {
+      socketRef.current.emit('typing', { chatId: activeChat.id, userId: user.id, isTyping: false });
+    }
   };
 
   const handleCreatePoll = (e) => {
@@ -1055,7 +1188,6 @@ export default function App() {
   const startOutboundCall = (type) => {
     if (!activeChat) return;
     const isGroup = activeChat.isGroup;
-    // Find target in 1-on-1 chat
     const partner = activeChat.Users.find(u => u.id !== user.id);
     if (!partner && !isGroup) return;
 
@@ -1070,20 +1202,17 @@ export default function App() {
     setActiveCall(callDetails);
     playRingtone();
 
-    // Send via socket to partner
-    if (socketRef.current && partner) {
-      socketRef.current.emit('call_user', {
-        userToCall: partner.id,
-        signalData: 'dummy_webrtc_offer',
-        fromUser: user,
-        type,
-        chatId: activeChat.id
+    // Persist call start in SQLite Database
+    if (partner) {
+      logCallStart(partner.id, type, 'ringing', activeChat.id).then(callLog => {
+        if (callLog) {
+          setActiveCall(prev => prev ? { ...prev, dbId: callLog.id } : null);
+          // The real WebRTC offer is emitted after media setup creates the peer connection.
+        }
       });
     }
 
-    // Auto accept simulator in case testing on single browser to show off WebRTC UI
     setTimeout(() => {
-      // Simulate answer if calling virtual AI helper
       if (partner?.role === 'AI') {
         stopRingtone();
         setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
@@ -1093,12 +1222,11 @@ export default function App() {
 
   const acceptInboundCall = () => {
     stopRingtone();
-    if (socketRef.current && activeCall) {
-      socketRef.current.emit('accept_call', {
-        toUser: activeCall.caller.id,
-        signalData: 'dummy_webrtc_answer'
-      });
+    if (activeCall) {
       setActiveCall(prev => prev ? { ...prev, status: 'connected' } : null);
+      if (activeCall.dbId) {
+        logCallUpdate(activeCall.dbId, 'connected');
+      }
     }
   };
 
@@ -1108,6 +1236,9 @@ export default function App() {
       socketRef.current.emit('decline_call', {
         toUser: activeCall.caller.id
       });
+      if (activeCall.dbId) {
+        logCallUpdate(activeCall.dbId, 'declined');
+      }
     }
     cleanupCallState();
   };
@@ -1119,19 +1250,11 @@ export default function App() {
       socketRef.current.emit('end_call', {
         toUser: partnerId
       });
+      if (activeCall.dbId) {
+        const finalStatus = activeCall.status === 'connected' ? 'completed' : 'missed';
+        logCallUpdate(activeCall.dbId, finalStatus);
+      }
     }
-    // Append to call history log
-    setCallHistory(prev => [
-      {
-        id: Math.random(),
-        type: activeCall?.type || 'video',
-        status: 'completed',
-        duration: `${Math.floor(callTimer / 60)}m ${callTimer % 60}s`,
-        date: 'Just now',
-        partner: activeCall?.caller.id === user.id ? activeCall?.receiver.name : activeCall?.caller.name
-      },
-      ...prev
-    ]);
     cleanupCallState();
   };
 
@@ -1251,21 +1374,26 @@ export default function App() {
           } catch (e) {
             console.error('Error applying pending remote answer:', e);
           }
-        } else {
+        } else if (!pc.remoteDescription && pc.signalingState === 'stable') {
           // Otherwise, create and send our offer
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          socketRef.current.emit('call_user', {
-            userToCall: partnerId,
-            signalData: offer,
-            fromUser: user,
-            type: activeCall.type,
-            chatId: activeChat?.id
-          });
+          if (socketRef.current) {
+            socketRef.current.emit('call_user', {
+              userToCall: partnerId,
+              signalData: offer,
+              fromUser: user,
+              type: activeCall.type,
+              chatId: activeChat?.id,
+              dbId: activeCall.dbId
+            });
+          }
+        } else {
+          return;
         }
       } else {
         // We are the receiver, apply offer and generate answer
-        const signalToApply = pendingSignalRef.current || (activeCall.signal !== 'dummy_webrtc_offer' ? activeCall.signal : null);
+        const signalToApply = pendingSignalRef.current || activeCall.signal;
         if (signalToApply && signalToApply.type === 'offer') {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(signalToApply));
@@ -1295,6 +1423,17 @@ export default function App() {
   // Live GPS Interactive Leaflet Map
   // ==========================================================================
 
+  const cleanupLeafletMap = () => {
+    if (leafletMapRef.current) {
+      try {
+        leafletMapRef.current.remove();
+      } catch (e) {
+        console.warn('Leaflet map cleanup failed:', e);
+      }
+      leafletMapRef.current = null;
+    }
+  };
+
   const renderMap = () => {
     // Check if Leaflet window instance exists
     if (!window.L) {
@@ -1302,13 +1441,16 @@ export default function App() {
       return;
     }
 
-    // Reset container DOM to prevent duplicate maps initialize error
     const container = mapContainerRef.current;
     if (!container) return;
-    container.innerHTML = "<div id='leaflet-map' style='height: 100%; width: 100%;'></div>";
+    const mapNode = container.querySelector('#leaflet-map');
+    if (!mapNode) return;
+
+    cleanupLeafletMap();
 
     // Setup map (centered around central park base)
-    const map = window.L.map('leaflet-map').setView([40.785091, -73.968285], 14);
+    const map = window.L.map(mapNode).setView([40.785091, -73.968285], 14);
+    leafletMapRef.current = map;
 
     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
@@ -1444,7 +1586,7 @@ export default function App() {
                   <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Full Name</label>
                   <input 
                     type="text" 
-                    placeholder="Jane Doe (Mom)" 
+                    placeholder="e.g. Samiksha" 
                     className="input-field" 
                     style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#1e293b' }}
                     value={authForm.name} 
@@ -1476,6 +1618,7 @@ export default function App() {
                     <option value="Child">Child</option>
                     <option value="Grandparent">Grandparent</option>
                     <option value="Guardian">Guardian</option>
+                    <option value="Host">Host</option>
                   </select>
                 </div>
                 <div style={{ marginBottom: '16px' }}>
@@ -1492,18 +1635,33 @@ export default function App() {
               </>
             )}
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Email Address</label>
-              <input 
-                type="email" 
-                placeholder="mom@family.com" 
-                className="input-field" 
-                style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#1e293b' }}
-                value={authForm.email} 
-                onChange={e => setAuthForm({ ...authForm, email: e.target.value })} 
-                required 
-              />
-            </div>
+            {authMode === 'login' ? (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Username or Email</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Samiksha" 
+                  className="input-field" 
+                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#1e293b' }}
+                  value={authForm.name} 
+                  onChange={e => setAuthForm({ ...authForm, name: e.target.value })} 
+                  required 
+                />
+              </div>
+            ) : (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Email Address</label>
+                <input 
+                  type="email" 
+                  placeholder="samiksha@family.com" 
+                  className="input-field" 
+                  style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#1e293b' }}
+                  value={authForm.email} 
+                  onChange={e => setAuthForm({ ...authForm, email: e.target.value })} 
+                  required 
+                />
+              </div>
+            )}
 
             <div style={{ marginBottom: '24px' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', display: 'block', marginBottom: '6px' }}>Password</label>
@@ -1538,6 +1696,7 @@ export default function App() {
               onClick={() => {
                 setAuthMode(authMode === 'login' ? 'signup' : 'login');
                 setAuthError('');
+                setAuthForm({ name: '', phone: '', email: '', password: '', role: 'Parent', profilePhoto: '' });
               }} 
               style={{ fontWeight: '600', color: '#6366f1', fontSize: '13px' }}
             >
@@ -1546,7 +1705,7 @@ export default function App() {
           </div>
           
           <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px', fontSize: '12px', color: '#64748b', textAlign: 'center' }}>
-            💡 <b>Tip:</b> If you seeded database from CSV, try logging in with <b>mom@family.com</b> and <b>Password123</b>!
+            💡 <b>Tip:</b> Login with username <b>Samiksha</b> / <b>Samiksha@1978</b> &nbsp;|&nbsp; <b>Host</b> / <b>Host@1942</b>
           </div>
         </div>
       </div>
@@ -2185,6 +2344,138 @@ export default function App() {
           </div>
         </div>
 
+        {/* Logged-In User Info Card */}
+        <div style={{
+          margin: '12px 16px',
+          padding: '14px 16px',
+          borderRadius: '16px',
+          background: 'linear-gradient(135deg, var(--color-primary-light) 0%, rgba(99,102,241,0.08) 100%)',
+          border: '1px solid rgba(99,102,241,0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
+          {/* Avatar with live dot */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <img
+              src={user.profilePhoto || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=6366f1&color=fff'}
+              alt="My Avatar"
+              style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(99,102,241,0.5)' }}
+              onError={e => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=6366f1&color=fff'; }}
+            />
+            {/* Green online dot */}
+            <div style={{
+              position: 'absolute', bottom: '1px', right: '1px',
+              width: '11px', height: '11px', borderRadius: '50%',
+              background: '#22c55e',
+              border: '2px solid var(--bg-primary)',
+            }} />
+          </div>
+
+          {/* User details */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user.name}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user.email}
+            </div>
+            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                fontSize: '10px', fontWeight: '700', padding: '2px 8px',
+                borderRadius: '20px',
+                background: user.role === 'Host' ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'var(--color-primary)',
+                color: '#fff',
+                letterSpacing: '0.3px',
+              }}>
+                {user.role}
+              </span>
+              <span style={{ fontSize: '10px', color: '#22c55e', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                Online
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 🟢 Live Active Users Panel */}
+        <div style={{
+          margin: '0 16px 12px',
+          padding: '12px 16px',
+          borderRadius: '14px',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-glass)',
+        }}>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+              {/* Pulsing dot */}
+              <span style={{ position: 'relative', display: 'inline-flex' }}>
+                <span style={{
+                  width: '9px', height: '9px', borderRadius: '50%',
+                  background: '#22c55e', display: 'block',
+                  boxShadow: '0 0 0 0 rgba(34,197,94,0.6)',
+                  animation: 'pulse-ring 1.4s ease-out infinite',
+                }} />
+              </span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Now</span>
+            </div>
+            {/* Count badge */}
+            <span style={{
+              fontSize: '11px', fontWeight: '800',
+              background: activeUsers.count > 0 ? '#22c55e' : '#94a3b8',
+              color: '#fff',
+              padding: '2px 9px',
+              borderRadius: '20px',
+              minWidth: '24px',
+              textAlign: 'center',
+            }}>
+              {activeUsers.count}
+            </span>
+          </div>
+
+          {/* User avatar bubbles */}
+          {activeUsers.users.length === 0 ? (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center', padding: '4px 0' }}>
+              No users online yet
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              {activeUsers.users.slice(0, 5).map(u => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                  {/* Avatar + green dot */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <img
+                      src={u.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=6366f1&color=fff`}
+                      alt={u.name}
+                      style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #22c55e' }}
+                      onError={e => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=6366f1&color=fff`; }}
+                    />
+                    <span style={{
+                      position: 'absolute', bottom: '0px', right: '0px',
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      background: '#22c55e', border: '1.5px solid var(--bg-secondary)',
+                      display: 'block'
+                    }} />
+                  </div>
+                  {/* Name + role */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {u.name} {u.id === user?.id ? <span style={{ color: '#6366f1', fontSize: '10px' }}>(You)</span> : ''}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#22c55e', fontWeight: '500' }}>{u.role} · Online</div>
+                  </div>
+                </div>
+              ))}
+              {activeUsers.users.length > 5 && (
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                  +{activeUsers.users.length - 5} more online
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Dynamic Sidebar Content based on Tab */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           
@@ -2314,7 +2605,7 @@ export default function App() {
               {/* List of members locations */}
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 {locations.map(loc => (
-                  <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border-glass)' }}>
+                  <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border-glass)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                       <img src={loc.User?.profilePhoto || 'https://via.placeholder.com/150'} className="avatar sm" />
                       <div>
@@ -2340,28 +2631,74 @@ export default function App() {
             <div style={{ padding: '20px', flex: 1, overflowY: 'auto', minHeight: 0 }}>
               <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', marginBottom: '16px' }}>Call History</h3>
               
-              {callHistory.map(call => (
-                <div key={call.id} style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-glass)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                      width: '40px', height: '40px', borderRadius: '50%', background: call.status === 'missed' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: call.status === 'missed' ? 'var(--color-danger)' : 'var(--color-success)'
-                    }}>
-                      {call.type === 'video' ? <Video size={18} /> : <Phone size={18} />}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: '600', fontSize: '14px' }}>{call.partner}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{call.date}</div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', fontSize: '12px' }}>
-                    <span style={{ color: call.status === 'missed' ? 'var(--color-danger)' : 'var(--text-secondary)' }}>
-                      {call.status === 'missed' ? 'Missed' : call.duration}
-                    </span>
-                  </div>
+              {callHistory.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  No call logs available.
                 </div>
-              ))}
+              ) : (
+                callHistory.map(call => {
+                  const partner = call.callerId === user.id ? call.receiver : call.caller;
+                  if (!partner) return null;
+                  
+                  const isIncoming = call.receiverId === user.id;
+                  
+                  let durationStr = '-';
+                  if (call.startedAt && call.endedAt) {
+                    const diff = new Date(call.endedAt) - new Date(call.startedAt);
+                    const diffSec = Math.floor(diff / 1000);
+                    const diffMin = Math.floor(diffSec / 60);
+                    const sec = diffSec % 60;
+                    durationStr = diffMin > 0 ? `${diffMin}m ${sec}s` : `${sec}s`;
+                  } else {
+                    if (call.status === 'missed') durationStr = 'Missed';
+                    else if (call.status === 'declined') durationStr = 'Declined';
+                    else if (call.status === 'ringing') durationStr = 'Ringing';
+                    else durationStr = 'No Answer';
+                  }
+
+                  return (
+                    <div key={call.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-glass)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <img 
+                          src={partner.profilePhoto || 'https://via.placeholder.com/150'} 
+                          className="avatar sm" 
+                          alt={partner.name}
+                        />
+                        <div>
+                          <div style={{ fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {partner.name}
+                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '400' }}>
+                              ({isIncoming ? 'Incoming' : 'Outgoing'})
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                            {new Date(call.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '32px', height: '32px', borderRadius: '50%', 
+                          background: call.status === 'missed' || call.status === 'declined' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: call.status === 'missed' || call.status === 'declined' ? 'var(--color-danger)' : 'var(--color-success)'
+                        }}>
+                          {call.type === 'video' ? <Video size={16} /> : <Phone size={16} />}
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '12px', minWidth: '60px' }}>
+                          <span style={{ 
+                            color: call.status === 'missed' || call.status === 'declined' ? 'var(--color-danger)' : 'var(--text-secondary)',
+                            fontWeight: call.status === 'missed' ? '700' : '400'
+                          }}>
+                            {durationStr}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
 
@@ -2391,7 +2728,7 @@ export default function App() {
                   />
                 </div>
 
-                <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center', padding: '14px', background: 'var(--bg-tertiary)', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: 'var(--bg-tertiary)', borderRadius: '12px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '600', fontSize: '13px' }}>Active System Translator Target</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Select default target for chat translations</div>
@@ -2770,7 +3107,7 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             
             {/* Chat Window Header */}
-            <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-glass)', display: 'flex', justifyBetween: 'space-between', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button 
                   className="btn-icon" 
@@ -2846,7 +3183,7 @@ export default function App() {
 
             {/* Pinned Message Bar if active */}
             {pinnedMessage && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', padding: '10px 20px', background: 'var(--color-primary-light)', borderBottom: '1px solid var(--border-glass)', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: 'var(--color-primary-light)', borderBottom: '1px solid var(--border-glass)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                   <Pin size={14} style={{ color: 'var(--color-primary)' }} />
                   <span style={{ color: 'var(--color-primary)', fontWeight: '600' }}>Pinned Message:</span>
@@ -2928,7 +3265,7 @@ export default function App() {
                                     textAlign: 'left', padding: '10px', borderRadius: '10px',
                                     border: `1.5px solid ${userVoted ? 'var(--color-primary)' : 'var(--border-glass)'}`,
                                     background: userVoted ? 'var(--color-primary-light)' : 'rgba(0,0,0,0.02)',
-                                    display: 'flex', justifyBetween: 'space-between', alignItems: 'center', justifyContent: 'space-between'
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                   }}
                                 >
                                   <span style={{ fontSize: '13px', fontWeight: '500' }}>{opt.optionText}</span>
@@ -3189,11 +3526,14 @@ export default function App() {
             position: 'relative'
           }}
         >
+          <div id="leaflet-map" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2 }} />
           {/* Dynamic SVG Fallback in case Leaflet fails or runs offline */}
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '40px', zIndex: 1
+            padding: '40px', zIndex: 1,
+            opacity: locations.length > 0 && window.L ? 0 : 1,
+            pointerEvents: locations.length > 0 && window.L ? 'none' : 'auto'
           }}>
             <Map size={48} style={{ color: 'var(--color-primary)', marginBottom: '16px' }} />
             <h4 style={{ fontFamily: 'Outfit', fontSize: '16px' }}>Interactive Location Tracker</h4>
@@ -3217,7 +3557,7 @@ export default function App() {
       {showAddChatModal && (
         <div className="modal-backdrop-blur">
           <div className="modal-card animate-fade-in">
-            <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center', marginBottom: '16px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Start Conversation</h3>
               <button className="btn-icon" onClick={() => setShowAddChatModal(false)}><X size={20} /></button>
             </div>
@@ -3297,7 +3637,7 @@ export default function App() {
       {showStoryCreator && (
         <div className="modal-backdrop-blur">
           <div className="modal-card animate-fade-in">
-            <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center', marginBottom: '16px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Create Status</h3>
               <button className="btn-icon" onClick={() => setShowStoryCreator(false)}><X size={20} /></button>
             </div>
@@ -3363,7 +3703,7 @@ export default function App() {
       {showPollBuilder && (
         <div className="modal-backdrop-blur">
           <div className="modal-card animate-fade-in">
-            <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center', marginBottom: '16px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Create Decision Poll</h3>
               <button className="btn-icon" onClick={() => setShowPollBuilder(false)}><X size={20} /></button>
             </div>
@@ -3431,7 +3771,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
                 <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', color: 'var(--text-primary)' }}>Add Family Member</h3>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Create a new account for Mom, Dad, or anyone in the family.</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Create a new account for Samiksha, Vijay, or anyone in the family.</p>
               </div>
               <button className="btn-icon" onClick={() => setShowAddMemberModal(false)}><X size={20} /></button>
             </div>
@@ -3477,7 +3817,7 @@ export default function App() {
                 <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Full Name *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Jane Doe (Mom)"
+                  placeholder="e.g. Samiksha (Parent)"
                   className="input-field"
                   value={addMemberForm.name}
                   onChange={e => setAddMemberForm({ ...addMemberForm, name: e.target.value })}
@@ -3501,7 +3841,7 @@ export default function App() {
                 <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Email Address *</label>
                 <input
                   type="email"
-                  placeholder="mom@family.com"
+                  placeholder="samiksha@family.com"
                   className="input-field"
                   value={addMemberForm.email}
                   onChange={e => setAddMemberForm({ ...addMemberForm, email: e.target.value })}
@@ -3606,6 +3946,11 @@ export default function App() {
           overflow-y: auto;
           overflow-x: hidden;
           -webkit-overflow-scrolling: touch;
+        }
+        @keyframes pulse-ring {
+          0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+          70%  { box-shadow: 0 0 0 7px rgba(34,197,94,0); }
+          100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
         }
         
         /* Bottom Navbar Items styling */

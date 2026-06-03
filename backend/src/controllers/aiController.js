@@ -3,42 +3,83 @@ import { User, Message, Chat } from '../models/index.js';
 
 // If the user has configured a GEMINI_API_KEY, we can make actual fetch calls to Google's Gemini API
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+// Retry/backoff configuration (override via env vars)
+const GEMINI_MAX_RETRIES = parseInt(process.env.GEMINI_MAX_RETRIES || '5', 10);
+const GEMINI_INITIAL_DELAY_MS = parseInt(process.env.GEMINI_INITIAL_DELAY_MS || '500', 10);
+const GEMINI_BACKOFF_FACTOR = parseFloat(process.env.GEMINI_BACKOFF_FACTOR || '2');
 
 const callGemini = async (prompt, systemInstruction = '') => {
   if (!GEMINI_API_KEY) {
     throw new Error('No API key configured');
   }
-  
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ],
-        systemInstruction: systemInstruction ? {
-          parts: [{ text: systemInstruction }]
-        } : undefined
-      }),
-    });
-    
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) {
-      throw new Error(data.error?.message || 'Empty response from Gemini API');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  let attempt = 0;
+  let delay = GEMINI_INITIAL_DELAY_MS;
+
+  while (true) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt }
+              ]
+            }
+          ],
+          systemInstruction: systemInstruction ? {
+            parts: [{ text: systemInstruction }]
+          } : undefined
+        }),
+      });
+
+      const textBody = await response.text();
+      let data;
+      try { data = textBody ? JSON.parse(textBody) : null; } catch (e) { data = null; }
+
+      // If HTTP status indicates transient server issue, consider retrying
+      const transientStatus = response.status === 503 || response.status === 429;
+      const modelExhausted = !!(data?.error?.details?.some(detail =>
+        detail?.reason === 'MODEL_CAPACITY_EXHAUSTED' ||
+        detail?.metadata?.reason === 'MODEL_CAPACITY_EXHAUSTED'
+      )) || (data?.error?.message && data.error.message.includes('MODEL_CAPACITY_EXHAUSTED'));
+
+      if (!response.ok) {
+        const errMsg = data?.error?.message || `HTTP ${response.status} ${response.statusText}`;
+        if ((transientStatus || modelExhausted) && attempt < GEMINI_MAX_RETRIES) {
+          attempt += 1;
+          await new Promise(r => setTimeout(r, delay));
+          delay = Math.floor(delay * GEMINI_BACKOFF_FACTOR);
+          continue;
+        }
+        throw new Error(errMsg);
+      }
+
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        const errMsg = data?.error?.message || 'Empty response from Gemini API';
+        throw new Error(errMsg);
+      }
+      return text.trim();
+    } catch (error) {
+      const msg = error?.message || String(error);
+      const isTransient = msg.includes('MODEL_CAPACITY_EXHAUSTED') || msg.includes('503') || msg.includes('429') || msg.includes('ECONNRESET');
+      if (isTransient && attempt < GEMINI_MAX_RETRIES) {
+        attempt += 1;
+        await new Promise(r => setTimeout(r, delay));
+        delay = Math.floor(delay * GEMINI_BACKOFF_FACTOR);
+        continue;
+      }
+
+      console.error('Gemini API call failed, falling back to local simulation:', msg);
+      throw error;
     }
-    return text.trim();
-  } catch (error) {
-    console.error('Gemini API call failed, falling back to local simulation:', error.message);
-    throw error;
   }
 };
 

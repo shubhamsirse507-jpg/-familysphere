@@ -1,14 +1,15 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { User, Location, BlockedUser, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
 
-const generateToken = (user) => {
+const generateToken = (user, sessionId) => {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role },
+    { id: user.id, email: user.email, name: user.name, role: user.role, sessionId },
     JWT_SECRET,
     { expiresIn: '30d' }
   );
@@ -64,6 +65,11 @@ export const signup = async (req, res) => {
       console.warn('Could not auto-join group chat:', groupErr.message);
     }
     
+    // Generate unique session ID and save to user
+    const sessionId = crypto.randomUUID();
+    user.activeSessionId = sessionId;
+    await user.save();
+
     res.status(201).json({
       id: user.id,
       name: user.name,
@@ -71,7 +77,7 @@ export const signup = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
-      token: generateToken(user),
+      token: generateToken(user, sessionId),
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -107,6 +113,11 @@ export const login = async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
     
+    // Generate unique session ID — invalidates any previous session
+    const sessionId = crypto.randomUUID();
+    user.activeSessionId = sessionId;
+    await user.save();
+
     res.json({
       id: user.id,
       name: user.name,
@@ -114,7 +125,7 @@ export const login = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
-      token: generateToken(user),
+      token: generateToken(user, sessionId),
     });
   } catch (error) {
     console.error('Login error:', error);

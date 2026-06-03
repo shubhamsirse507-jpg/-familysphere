@@ -46,6 +46,10 @@ export const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  activeSessionId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 // --- Chat Model ---
@@ -253,13 +257,6 @@ export const BlockedUser = sequelize.define('BlockedUser', {
     type: DataTypes.UUID,
     allowNull: false,
   },
-}, {
-  indexes: [
-    {
-      unique: true,
-      fields: ['blockerId', 'blockedId'],
-    }
-  ]
 });
 
 // =================== ASSOCIATIONS ===================
@@ -267,9 +264,9 @@ export const BlockedUser = sequelize.define('BlockedUser', {
 // Chat <-> User (Many-to-Many via ChatMember)
 Chat.belongsToMany(User, { through: ChatMember, foreignKey: 'chatId' });
 User.belongsToMany(Chat, { through: ChatMember, foreignKey: 'userId' });
-Chat.hasMany(ChatMember, { foreignKey: 'chatId' });
+Chat.hasMany(ChatMember, { foreignKey: 'chatId', onDelete: 'CASCADE' });
 ChatMember.belongsTo(Chat, { foreignKey: 'chatId' });
-User.hasMany(ChatMember, { foreignKey: 'userId' });
+User.hasMany(ChatMember, { foreignKey: 'userId', onDelete: 'CASCADE' });
 ChatMember.belongsTo(User, { foreignKey: 'userId' });
 
 // Messages
@@ -307,11 +304,11 @@ User.hasMany(StoryView, { foreignKey: 'userId', onDelete: 'CASCADE' });
 StoryView.belongsTo(User, { foreignKey: 'userId' });
 
 // Calls
-User.hasMany(Call, { as: 'outgoingCalls', foreignKey: 'callerId' });
+User.hasMany(Call, { as: 'outgoingCalls', foreignKey: 'callerId', onDelete: 'CASCADE' });
 Call.belongsTo(User, { as: 'caller', foreignKey: 'callerId' });
-User.hasMany(Call, { as: 'incomingCalls', foreignKey: 'receiverId' });
+User.hasMany(Call, { as: 'incomingCalls', foreignKey: 'receiverId', onDelete: 'CASCADE' });
 Call.belongsTo(User, { as: 'receiver', foreignKey: 'receiverId' });
-Chat.hasMany(Call, { foreignKey: 'chatId' });
+Chat.hasMany(Call, { foreignKey: 'chatId', onDelete: 'CASCADE' });
 Call.belongsTo(Chat, { foreignKey: 'chatId' });
 
 // Locations
@@ -320,6 +317,7 @@ Location.belongsTo(User, { foreignKey: 'userId' });
 
 // Blocked Users
 User.hasMany(BlockedUser, { as: 'blockedUsers', foreignKey: 'blockerId', onDelete: 'CASCADE' });
+User.hasMany(BlockedUser, { as: 'blockedByUsers', foreignKey: 'blockedId', onDelete: 'CASCADE' });
 BlockedUser.belongsTo(User, { as: 'blocker', foreignKey: 'blockerId' });
 BlockedUser.belongsTo(User, { as: 'blocked', foreignKey: 'blockedId' });
 

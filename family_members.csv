@@ -1,6 +1,3 @@
 Name,Phone,Email,Password,Role,ProfilePhoto
-Jane Doe (Mom),1234567890,mom@family.com,Password123,Parent,https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150
-John Doe (Dad),1234567891,dad@family.com,Password123,Parent,https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150
-Billy Doe (Son),1234567892,son@family.com,Password123,Child,https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150
-Mary Doe (Grandma),1234567893,grandma@family.com,Password123,Grandparent,https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150
-Shuham,9158930681,Host@family.com,Password1234,Host,https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Ftse3.mm.bing.net%2Fth%2Fid%2FOIP.NXRshQdmN8uc4nChtBYBawHaE-%3Fr%3D0%26pid%3DApi&f=1&ipt=82a54697b86f9e208f7e608976604eb1154d5c92bfa75647e0244fe36fb483db&ipo=images
+Host,9000000004,host@family.com,Host@1942,Host,https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150
+Host2,3158390681,Host2@family.com,Host2@1945,Host2,https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150

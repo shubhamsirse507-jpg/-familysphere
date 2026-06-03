@@ -3,7 +3,7 @@ import path from 'path';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { connectDB, sequelize } from './config/db.js';
-import { User, Chat, ChatMember, Message, Location, Story } from './models/index.js';
+import { User, Chat, ChatMember, Message, Location, Story, PollOption } from './models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,68 +126,65 @@ export const runSeeding = async (force = true) => {
     }
     console.log('Created Family Group Chat and joined all members.');
 
-    // Seed some mock conversation history
-    const mom = createdUsers.find(u => u.role === 'Parent' && u.name.includes('Mom'));
-    const dad = createdUsers.find(u => u.role === 'Parent' && u.name.includes('Dad'));
-    const son = createdUsers.find(u => u.role === 'Child');
+    // Seed some mock conversation history using first 3 users
+    const [user1, user2, user3] = createdUsers;
 
-    if (mom && dad && son) {
+    if (user1 && user2) {
       const msg1 = await Message.create({
         chatId: familyGroup.id,
-        senderId: mom.id,
+        senderId: user1.id,
         type: 'text',
-        content: 'Hi family! Welcome to our new FamilySphere home! ❤️',
+        content: `Hi everyone! Welcome to our FamilySphere! ❤️`,
       });
 
       const msg2 = await Message.create({
         chatId: familyGroup.id,
-        senderId: dad.id,
+        senderId: user2.id,
         type: 'text',
-        content: 'Wow this looks great! Clean, fast, and encrypted! 🚀',
+        content: 'Looks great! So clean and fast! 🚀',
         replyToId: msg1.id,
       });
 
-      const msg3 = await Message.create({
-        chatId: familyGroup.id,
-        senderId: son.id,
-        type: 'text',
-        content: 'Can we decide what to have for dinner? Let me make a poll.',
-      });
+      if (user3) {
+        await Message.create({
+          chatId: familyGroup.id,
+          senderId: user3.id,
+          type: 'text',
+          content: 'Let me start a poll for tonight\'s dinner!',
+        });
 
-      // Create a dinner poll
-      const pollMsg = await Message.create({
-        chatId: familyGroup.id,
-        senderId: son.id,
-        type: 'poll',
-        content: 'What should we eat tonight? 🍕🍔🍣',
-      });
+        // Create a dinner poll
+        const pollMsg = await Message.create({
+          chatId: familyGroup.id,
+          senderId: user3.id,
+          type: 'poll',
+          content: 'What should we eat tonight? 🍕🍔🍣',
+        });
 
-      // Add options for dinner
-      await Message.sequelize.query(
-        `INSERT INTO PollOptions (id, messageId, optionText, createdAt, updatedAt) VALUES 
-        (lower(hex(randomblob(16))), '${pollMsg.id}', 'Homemade Pizza 🍕', datetime('now'), datetime('now')),
-        (lower(hex(randomblob(16))), '${pollMsg.id}', 'Tacos & Guac 🌮', datetime('now'), datetime('now')),
-        (lower(hex(randomblob(16))), '${pollMsg.id}', 'Sushi Delivery 🍣', datetime('now'), datetime('now'))`
-      );
-
+        // Add options for dinner using database-agnostic Sequelize bulkCreate
+        await PollOption.bulkCreate([
+          { messageId: pollMsg.id, optionText: 'Homemade Pizza 🍕' },
+          { messageId: pollMsg.id, optionText: 'Tacos & Guac 🌮' },
+          { messageId: pollMsg.id, optionText: 'Sushi Delivery 🍣' }
+        ]);
+      }
       console.log('Seeded initial family messages and group poll.');
     }
 
-    // Seed a couple of status updates (WhatsApp Stories)
-    if (mom) {
+    // Seed status stories for first 2 users
+    if (user1) {
       await Story.create({
-        userId: mom.id,
+        userId: user1.id,
         type: 'text',
         content: 'Loving the sunny weather today! ☀️🌸',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
     }
-    if (son) {
+    if (user2) {
       await Story.create({
-        userId: son.id,
-        type: 'image',
-        content: 'Look at my school science project! 🧪🧬',
-        mediaUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400',
+        userId: user2.id,
+        type: 'text',
+        content: 'Great day with the family! 🏡❤️',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
     }

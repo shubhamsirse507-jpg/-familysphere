@@ -48,14 +48,16 @@ export const getFamilyLocations = async (req, res) => {
     });
     const blockedUserIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
     
+    const whereCondition = { isLive: true };
+    if (blockedUserIds.length > 0) {
+      whereCondition.userId = {
+        [Op.notIn]: blockedUserIds
+      };
+    }
+    
     // Only return live coordinates of family members, excluding blocked ones
     const locations = await Location.findAll({
-      where: { 
-        isLive: true,
-        userId: {
-          [Op.notIn]: blockedUserIds
-        }
-      },
+      where: whereCondition,
       include: [{ model: User, attributes: ['id', 'name', 'role', 'profilePhoto'] }],
     });
     

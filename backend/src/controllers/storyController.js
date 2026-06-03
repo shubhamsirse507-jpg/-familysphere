@@ -45,15 +45,20 @@ export const getActiveStories = async (req, res) => {
     });
     const blockedUserIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
     
+    const whereCondition = {
+      expiresAt: {
+        [Op.gt]: now
+      }
+    };
+    
+    if (blockedUserIds.length > 0) {
+      whereCondition.userId = {
+        [Op.notIn]: blockedUserIds
+      };
+    }
+    
     const stories = await Story.findAll({
-      where: {
-        expiresAt: {
-          [Op.gt]: now
-        },
-        userId: {
-          [Op.notIn]: blockedUserIds
-        }
-      },
+      where: whereCondition,
       include: [
         { model: User, attributes: ['id', 'name', 'role', 'profilePhoto'] },
         { 

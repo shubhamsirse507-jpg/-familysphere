@@ -156,14 +156,21 @@ export const createChat = async (req, res) => {
       const userChats = await ChatMember.findAll({ where: { userId }, attributes: ['chatId'] });
       const targetChats = await ChatMember.findAll({ where: { userId: targetUserId }, attributes: ['chatId'] });
       
-      const commonChat = userChats.find(uc => targetChats.some(tc => tc.chatId === uc.chatId));
+      const commonChatIds = userChats
+        .map(uc => uc.chatId)
+        .filter(chatId => targetChats.some(tc => tc.chatId === chatId));
       
-      if (commonChat) {
-        // Double check it's a 1-to-1 chat, not a group chat
-        const existingChat = await Chat.findByPk(commonChat.chatId, {
+      if (commonChatIds.length > 0) {
+        // Find if any of these common chats is a 1-on-1 chat
+        const existingChat = await Chat.findOne({
+          where: {
+            id: commonChatIds,
+            isGroup: false
+          },
           include: [{ model: User, attributes: ['id', 'name', 'profilePhoto', 'role'] }],
         });
-        if (!existingChat.isGroup) {
+        
+        if (existingChat) {
           return res.json(existingChat);
         }
       }
