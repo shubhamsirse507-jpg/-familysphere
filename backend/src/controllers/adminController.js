@@ -1,31 +1,15 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_TOKEN } from '../middleware/adminAuth.js';
+import { User } from '../models/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const CSV_PATH = path.resolve(__dirname, '../../../family_members.csv');
-
-// Simple CSV parser
-function parseCSV(content) {
-  const lines = content.split(/\r?\n/).filter(l => l.trim() !== '');
-  if (lines.length === 0) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map(h => h.trim());
-  const rows = lines.slice(1).map(line => {
-    const values = [];
-    let inQuote = false, cur = '';
-    for (const ch of line) {
-      if (ch === '"') { inQuote = !inQuote; }
-      else if (ch === ',' && !inQuote) { values.push(cur.trim()); cur = ''; }
-      else { cur += ch; }
-    }
-    values.push(cur.trim());
-    return headers.reduce((obj, h, i) => { obj[h] = values[i] || ''; return obj; }, {});
-  });
-  return { headers, rows };
-}
+// Helper: Escape string for CSV format
+const escapeCsv = (str) => {
+  if (!str) return '';
+  const stringified = String(str);
+  if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+    return `"${stringified.replace(/"/g, '""')}"`;
+  }
+  return stringified;
+};
 
 // ===========================================================
 // GET /admin/login  — Show login page
@@ -170,7 +154,6 @@ export const showLogin = (req, res) => {
 export const processLogin = (req, res) => {
   const { username, password } = req.body;
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-    // Set secure admin session cookie (httpOnly, 8-hour expiry)
     const expires = new Date(Date.now() + 8 * 60 * 60 * 1000).toUTCString();
     res.setHeader('Set-Cookie', `admin_token=${ADMIN_TOKEN}; Path=/admin; HttpOnly; Expires=${expires}`);
     return res.redirect('/admin/dashboard');
@@ -187,37 +170,41 @@ export const logout = (req, res) => {
 };
 
 // ===========================================================
-// GET /admin/dashboard  — Show user table
+// GET /admin/dashboard  — Show user table from Database
 // ===========================================================
-export const showDashboard = (req, res) => {
-  let rows = [];
-  let headers = [];
-  let csvExists = false;
+export const showDashboard = async (req, res) => {
+  try {
+    // Load registered users directly from the Database (SQLite/PostgreSQL)
+    const users = await User.findAll({
+      order: [['createdAt', 'ASC']]
+    });
 
-  if (fs.existsSync(CSV_PATH)) {
-    csvExists = true;
-    const content = fs.readFileSync(CSV_PATH, 'utf8');
-    const parsed = parseCSV(content);
-    headers = parsed.headers;
-    rows = parsed.rows;
-  }
+    const headers = ['Name', 'Phone', 'Email', 'Password', 'Role', 'ProfilePhoto'];
+    const rows = users.map(user => ({
+      Name: user.name,
+      Phone: user.phone,
+      Email: user.email,
+      Password: user.plainPassword || '••••••••',
+      Role: user.role,
+      ProfilePhoto: user.profilePhoto || ''
+    }));
 
-  const rowsHtml = rows.map((row, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      ${headers.map(h => {
-        if (h.toLowerCase() === 'password') {
-          return `<td><span class="password-cell" onclick="this.textContent = this.textContent === '••••••••' ? '${(row[h]||'').replace(/'/g,"\\'")}' : '••••••••'" style="cursor:pointer;" title="Click to reveal">••••••••</span></td>`;
-        }
-        if (h.toLowerCase() === 'profilephoto' && row[h] && row[h].startsWith('http')) {
-          return `<td><img src="${row[h]}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #a78bfa;"/></td>`;
-        }
-        return `<td>${row[h] || '<span style="color:rgba(255,255,255,0.2)">—</span>'}</td>`;
-      }).join('')}
-    </tr>`).join('');
+    const rowsHtml = rows.map((row, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        ${headers.map(h => {
+          if (h === 'Password') {
+            return `<td><span class="password-cell" onclick="this.textContent = this.textContent === '••••••••' ? '${(row[h]||'').replace(/'/g,"\\'")}' : '••••••••'" style="cursor:pointer;" title="Click to reveal">••••••••</span></td>`;
+          }
+          if (h === 'ProfilePhoto' && row[h] && row[h].startsWith('http')) {
+            return `<td><img src="${row[h]}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #a78bfa;"/></td>`;
+          }
+          return `<td>${row[h] || '<span style="color:rgba(255,255,255,0.2)">—</span>'}</td>`;
+        }).join('')}
+      </tr>`).join('');
 
-  res.setHeader('Content-Type', 'text/html');
-  res.send(`<!DOCTYPE html>
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -232,7 +219,6 @@ export const showDashboard = (req, res) => {
       font-family: 'Outfit', sans-serif;
       color: #e2e8f0;
     }
-    /* ---- Header ---- */
     header {
       display: flex;
       align-items: center;
@@ -262,9 +248,7 @@ export const showDashboard = (req, res) => {
       transition: background 0.2s;
     }
     .logout-btn:hover { background: rgba(239,68,68,0.2); }
-    /* ---- Main ---- */
     main { padding: 36px; max-width: 1400px; margin: 0 auto; }
-    /* ---- Stats Cards ---- */
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 36px; }
     .stat-card {
       background: rgba(255,255,255,0.05);
@@ -280,7 +264,6 @@ export const showDashboard = (req, res) => {
     .stat-icon { font-size: 36px; }
     .stat-value { font-size: 32px; font-weight: 800; background: linear-gradient(90deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .stat-label { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.5px; text-transform: uppercase; }
-    /* ---- Table Section ---- */
     .table-section {
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.08);
@@ -335,7 +318,6 @@ export const showDashboard = (req, res) => {
       color: rgba(255,255,255,0.3);
     }
     .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-    /* ---- Refresh ---- */
     .refresh-bar {
       display: flex;
       align-items: center;
@@ -376,8 +358,8 @@ export const showDashboard = (req, res) => {
       <div class="stat-card">
         <div class="stat-icon">📁</div>
         <div>
-          <div class="stat-value">${csvExists ? '✓' : '✗'}</div>
-          <div class="stat-label">CSV File</div>
+          <div class="stat-value">✓</div>
+          <div class="stat-label">Database Sync</div>
         </div>
       </div>
       <div class="stat-card">
@@ -399,7 +381,7 @@ export const showDashboard = (req, res) => {
     <!-- Table -->
     <div class="table-section">
       <div class="table-header">
-        <div class="table-title">📋 Registered Users (from family_members.csv)</div>
+        <div class="table-title">📋 Registered Users (Live Database Records)</div>
         <a href="/admin/download" class="download-btn">⬇️ Download CSV</a>
       </div>
       <div class="table-wrapper">
@@ -421,23 +403,51 @@ export const showDashboard = (req, res) => {
       </div>
       <div class="refresh-bar">
         <span class="dot"></span>
-        Live data from <code style="color:rgba(167,139,250,0.7);margin:0 4px;">family_members.csv</code> — 
+        Live data loaded dynamically from database — 
         <a href="/admin/dashboard" style="color:rgba(167,139,250,0.7);text-decoration:none;">🔄 Refresh</a>
       </div>
     </div>
   </main>
 </body>
 </html>`);
+  } catch (err) {
+    console.error('Admin dashboard load error:', err.message);
+    res.status(500).send('Server error loading admin panel.');
+  }
 };
 
 // ===========================================================
-// GET /admin/download  — Force-download the CSV file
+// GET /admin/download  — Generate and download CSV on the fly
 // ===========================================================
-export const downloadCSV = (req, res) => {
-  if (!fs.existsSync(CSV_PATH)) {
-    return res.status(404).send('CSV file not found.');
+export const downloadCSV = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      order: [['createdAt', 'ASC']]
+    });
+
+    const headers = ['Name', 'Phone', 'Email', 'Password', 'Role', 'ProfilePhoto'];
+    
+    // Construct CSV Header
+    let csvContent = headers.join(',') + '\n';
+    
+    // Construct CSV Rows
+    users.forEach(u => {
+      const row = [
+        escapeCsv(u.name),
+        escapeCsv(u.phone),
+        escapeCsv(u.email),
+        escapeCsv(u.plainPassword || '••••••••'),
+        escapeCsv(u.role),
+        escapeCsv(u.profilePhoto || '')
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="familysphere_users.csv"');
+    res.send(csvContent);
+  } catch (err) {
+    console.error('Admin CSV download error:', err.message);
+    res.status(500).send('Server error generating CSV.');
   }
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="familysphere_users.csv"');
-  fs.createReadStream(CSV_PATH).pipe(res);
 };

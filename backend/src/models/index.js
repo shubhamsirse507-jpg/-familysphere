@@ -26,6 +26,10 @@ export const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  plainPassword: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   profilePhoto: {
     type: DataTypes.TEXT, // Base64 or image url
     allowNull: true,

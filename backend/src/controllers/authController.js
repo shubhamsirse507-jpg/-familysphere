@@ -149,6 +149,7 @@ export const signup = async (req, res) => {
       phone,
       email,
       passwordHash,
+      plainPassword: password,
       role: role || 'Parent',
       profilePhoto: profilePhoto || null,
     });

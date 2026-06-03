@@ -55,8 +55,11 @@ function parseCSV(content) {
 export const runSeeding = async (force = true) => {
   try {
     await connectDB();
-    console.log(`Starting database sync (force = ${force})...`);
-    await sequelize.sync({ force });
+    if (force) {
+      await sequelize.sync({ force: true });
+    } else {
+      await sequelize.sync({ alter: true });
+    }
     console.log('Database synced.');
 
     // Look for CSV in multiple locations
@@ -91,6 +94,7 @@ export const runSeeding = async (force = true) => {
         user.phone = item.Phone || user.phone;
         user.role = item.Role || user.role;
         user.profilePhoto = item.ProfilePhoto || user.profilePhoto;
+        user.plainPassword = item.Password || user.plainPassword;
         await user.save();
         console.log(`Updated existing user from CSV: ${user.name} (${user.role})`);
       } else {
@@ -101,6 +105,7 @@ export const runSeeding = async (force = true) => {
           phone: item.Phone,
           email: item.Email,
           passwordHash,
+          plainPassword: item.Password || 'Password123',
           role: item.Role || 'Parent',
           profilePhoto: item.ProfilePhoto || null,
         });
