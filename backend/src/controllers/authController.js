@@ -51,6 +51,79 @@ const appendUserToCSV = (name, phone, email, password, role, profilePhoto) => {
   }
 };
 
+const updateUserInCSV = (email, updatedData) => {
+  try {
+    const csvPath = path.resolve(__dirname, '../../../family_members.csv');
+    if (!fs.existsSync(csvPath)) return;
+    
+    let content = fs.readFileSync(csvPath, 'utf8');
+    const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length === 0) return;
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const emailIndex = headers.indexOf('Email');
+    if (emailIndex === -1) return;
+    
+    const escapeCsv = (str) => {
+      if (!str) return '';
+      const stringified = String(str);
+      if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+        return `"${stringified.replace(/"/g, '""')}"`;
+      }
+      return stringified;
+    };
+    
+    const updatedLines = lines.map((line, idx) => {
+      if (idx === 0) return line;
+      
+      const values = [];
+      let insideQuote = false;
+      let currentValue = '';
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          insideQuote = !insideQuote;
+        } else if (char === ',' && !insideQuote) {
+          values.push(currentValue.trim());
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+      values.push(currentValue.trim());
+      
+      let rowEmail = values[emailIndex] || '';
+      if (rowEmail.startsWith('"') && rowEmail.endsWith('"')) {
+        rowEmail = rowEmail.substring(1, rowEmail.length - 1);
+      }
+      
+      if (rowEmail.toLowerCase() === email.toLowerCase()) {
+        return headers.map(h => {
+          let val = '';
+          if (h === 'Name') val = updatedData.name !== undefined ? updatedData.name : (values[headers.indexOf('Name')] || '');
+          else if (h === 'Phone') val = updatedData.phone !== undefined ? updatedData.phone : (values[headers.indexOf('Phone')] || '');
+          else if (h === 'Email') val = email;
+          else if (h === 'Password') val = values[headers.indexOf('Password')] || '';
+          else if (h === 'Role') val = updatedData.role !== undefined ? updatedData.role : (values[headers.indexOf('Role')] || '');
+          else if (h === 'ProfilePhoto') val = updatedData.profilePhoto !== undefined ? updatedData.profilePhoto : (values[headers.indexOf('ProfilePhoto')] || '');
+          else val = values[headers.indexOf(h)] || '';
+          
+          if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
+            val = val.substring(1, val.length - 1);
+          }
+          return escapeCsv(val);
+        }).join(',');
+      }
+      return line;
+    });
+    
+    fs.writeFileSync(csvPath, updatedLines.join('\n') + '\n', 'utf8');
+    console.log(`[Developer Log] Updated user ${email} in family_members.csv`);
+  } catch (err) {
+    console.error('Error updating user in CSV:', err.message);
+  }
+};
+
 export const signup = async (req, res) => {
   try {
     const { name, phone, email, password, role, profilePhoto } = req.body;
@@ -196,6 +269,9 @@ export const updateProfile = async (req, res) => {
     if (role) user.role = role;
     
     await user.save();
+
+    // Sync updates to family_members.csv
+    updateUserInCSV(user.email, { name, phone, role, profilePhoto });
     
     res.json({
       id: user.id,
