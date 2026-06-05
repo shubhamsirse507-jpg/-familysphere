@@ -617,6 +617,12 @@ export default function App() {
 
     try {
       let finalMediaUrl = newMemoryUrl.trim();
+      let finalSourceType = newMemorySourceType;
+
+      // Auto-detect Google Drive URL and adjust sourceType accordingly
+      if (finalSourceType !== 'local' && (finalMediaUrl.includes('drive.google.com') || finalMediaUrl.includes('docs.google.com'))) {
+        finalSourceType = 'googledrive';
+      }
 
       // Step 1: If local file, upload it first via multer endpoint
       if (newMemorySourceType === 'local' && memoryUploadFile) {
@@ -650,7 +656,7 @@ export default function App() {
           title: newMemoryTitle.trim(),
           description: newMemoryDesc.trim(),
           mediaUrl: finalMediaUrl,
-          sourceType: newMemorySourceType,
+          sourceType: finalSourceType,
         }),
       });
 
@@ -691,15 +697,41 @@ export default function App() {
     }
   };
 
+  // Helper to check if a URL belongs to Google Drive or Docs
+  const isGoogleDriveUrl = (url) => {
+    if (!url) return false;
+    return url.includes('drive.google.com') || url.includes('docs.google.com');
+  };
+
   // Resolve a memory's mediaUrl to a displayable URL
   // Handles: local server paths, Google Drive share links, and external URLs
   const resolveMemoryMedia = (mediaUrl) => {
     if (!mediaUrl) return '';
-    // Google Drive share link → convert to embed URL
-    const driveMatch = mediaUrl.match(/\/file\/d\/([^/]+)\//);
-    if (driveMatch) {
-      return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+
+    // Check if it's a Google Drive/Doc folder
+    const folderMatch = mediaUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (folderMatch) {
+      return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#grid`;
     }
+
+    // Check if it's a Google Drive/Doc file
+    const dMatch = mediaUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const idParamMatch = mediaUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const driveId = (dMatch && dMatch[1]) || (idParamMatch && idParamMatch[1]);
+    
+    if (driveId) {
+      if (mediaUrl.includes('/document/')) {
+        return `https://docs.google.com/document/d/${driveId}/preview`;
+      }
+      if (mediaUrl.includes('/presentation/')) {
+        return `https://docs.google.com/presentation/d/${driveId}/preview`;
+      }
+      if (mediaUrl.includes('/spreadsheets/')) {
+        return `https://docs.google.com/spreadsheets/d/${driveId}/preview`;
+      }
+      return `https://drive.google.com/file/d/${driveId}/preview`;
+    }
+
     // Already absolute URL
     if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
       return mediaUrl;
@@ -710,7 +742,7 @@ export default function App() {
 
   // Is this media a video? (checks extension or mimetype hint)
   const isVideoMedia = (mediaUrl, sourceType) => {
-    if (sourceType === 'googledrive') return false; // always use iframe for Drive
+    if (sourceType === 'googledrive' || isGoogleDriveUrl(mediaUrl)) return false; // always use iframe for Drive
     const videoExts = ['.mp4', '.webm', '.mov', '.avi', '.mpeg', '.mpg'];
     return videoExts.some(ext => mediaUrl?.toLowerCase().endsWith(ext));
   };
@@ -2430,7 +2462,7 @@ export default function App() {
             {sharedPhotos.map(memory => {
               const mediaUrl = resolveMemoryMedia(memory.mediaUrl);
               const isVideo = isVideoMedia(memory.mediaUrl, memory.sourceType);
-              const isDrive = memory.sourceType === 'googledrive';
+              const isDrive = memory.sourceType === 'googledrive' || isGoogleDriveUrl(memory.mediaUrl);
               const uploaderName = memory.uploader?.name || 'Family';
               const isOwner = memory.userId === user?.id;
 
