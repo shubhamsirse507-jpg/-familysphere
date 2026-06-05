@@ -48,3 +48,5 @@ Thumbs.db
 powershell.cmd
 test_memories.mjs
 
+# User uploads
+backend/public/uploads/

@@ -622,7 +622,9 @@ export default function App() {
       if (newMemorySourceType === 'local' && memoryUploadFile) {
         const formData = new FormData();
         formData.append('file', memoryUploadFile);
-        const uploadRes = await fetch(`${API_BASE}/upload`, {
+        // Use SOCKET_BASE (direct backend) NOT API_BASE (Vite proxy).
+        // Vite proxy corrupts multipart/form-data boundaries for binary uploads.
+        const uploadRes = await fetch(`${SOCKET_BASE}/api/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData,
@@ -806,10 +808,12 @@ export default function App() {
     formData.append('file', file);
 
     try {
-      const res = await fetch(`${API_BASE}/upload`, {
+      // NOTE: Use SOCKET_BASE (direct backend) NOT API_BASE (Vite proxy) for multipart uploads.
+      // The Vite dev proxy corrupts multipart/form-data boundaries — bypass it entirely.
+      const res = await fetch(`${SOCKET_BASE}/api/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
-        // NOTE: Do NOT set Content-Type — browser sets it automatically with boundary
+        // Do NOT set Content-Type — browser sets it automatically with the correct boundary
         body: formData,
       });
 
@@ -1185,28 +1189,29 @@ export default function App() {
     const file = e.target.files[0];
     if (!file) return;
     setIsUploadingStoryMedia(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/upload`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ base64Data: reader.result, filename: file.name })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setNewStory(prev => ({ ...prev, mediaUrl: data.url }));
-        }
-      } catch (err) {
-        console.error('Story image upload error:', err);
-      } finally {
-        setIsUploadingStoryMedia(false);
+    try {
+      // Use FormData (multer) — NOT base64 JSON (old broken format)
+      // Use SOCKET_BASE directly to bypass Vite proxy multipart corruption
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${SOCKET_BASE}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Resolve to full URL so the preview image loads correctly
+        setNewStory(prev => ({ ...prev, mediaUrl: `${SOCKET_BASE}${data.url}` }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('Story image upload error:', err.error || 'Upload failed');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Story image upload error:', err);
+    } finally {
+      setIsUploadingStoryMedia(false);
+    }
   };
 
   const handleDeleteStory = async (storyId) => {
