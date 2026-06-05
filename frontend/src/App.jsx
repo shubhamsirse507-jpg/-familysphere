@@ -20,6 +20,61 @@ const resolveMediaUrl = (url) => {
   return `${SOCKET_BASE}${url}`;
 };
 
+const renderAvatar = (u, size = 'md', borderStyle = {}) => {
+  const photoUrl = u?.profilePhoto || u?.avatar;
+  if (photoUrl && photoUrl.trim() !== '' && !photoUrl.includes('placeholder.com') && !photoUrl.includes('ui-avatars.com')) {
+    return (
+      <img
+        src={resolveMediaUrl(photoUrl)}
+        alt={u?.name}
+        className={`avatar ${size}`}
+        style={borderStyle}
+      />
+    );
+  }
+  
+  const initials = u?.name ? u.name.charAt(0).toUpperCase() : '?';
+  const sizeMap = {
+    sm: { width: '32px', height: '32px', fontSize: '11px' },
+    md: { width: '44px', height: '44px', fontSize: '15px' },
+    lg: { width: '80px', height: '80px', fontSize: '26px' }
+  };
+  const sizeStyle = sizeMap[size] || sizeMap.md;
+  
+  const role = u?.role?.toLowerCase() || '';
+  let gradient = 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)';
+  if (role === 'ai') {
+    gradient = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+  } else if (role === 'parent') {
+    gradient = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+  } else if (role === 'grandparent') {
+    gradient = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+  } else if (role === 'child') {
+    gradient = 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)';
+  }
+
+  return (
+    <div
+      className={`avatar ${size}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: gradient,
+        color: '#ffffff',
+        fontWeight: '800',
+        fontFamily: 'var(--font-display)',
+        borderRadius: '50%',
+        userSelect: 'none',
+        ...sizeStyle,
+        ...borderStyle
+      }}
+    >
+      {initials}
+    </div>
+  );
+};
+
 export default function App() {
   // --- UI & Styling State ---
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -67,7 +122,11 @@ export default function App() {
   const [stories, setStories] = useState([]); // Grouped stories by user
   const [activeStoryViewer, setActiveStoryViewer] = useState(null); // { user, stories, index }
   const [showStoryCreator, setShowStoryCreator] = useState(false);
-  const [newStory, setNewStory] = useState({ type: 'text', content: '', mediaUrl: '' });
+  const [newStory, setNewStory] = useState({ type: 'text', content: '', mediaUrl: 'linear-gradient(135deg, #1e2640 0%, #111827 100%)' });
+  const [isUploadingStoryMedia, setIsUploadingStoryMedia] = useState(false);
+  const [storyPaused, setStoryPaused] = useState(false);
+  const [showStoryViewersList, setShowStoryViewersList] = useState(false);
+  const [storyReplyText, setStoryReplyText] = useState('');
 
   // --- Calling State (WebRTC & Loopback simulation) ---
   const [activeCall, setActiveCall] = useState(null); // { id, caller, receiver, type, status: 'ringing'|'connected'|'ended' }
@@ -91,42 +150,21 @@ export default function App() {
   const [translateTarget, setTranslateTarget] = useState('Spanish');
 
   // --- Expanded Social Features State ---
-  const [feedPosts, setFeedPosts] = useState([
-    {
-      id: 1,
-      sender: { name: 'Samiksha', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
-      content: 'Sunday Dinner is locked in! Making dal makhani and jeera rice. Let me know if you want any specific sides! 🍛🥘',
-      image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600',
-      likes: 4,
-      likedByMe: true,
-      comments: [
-        { id: 1, sender: 'Varsha', content: 'Can we add some papad please?? 🙏' },
-        { id: 2, sender: 'Vijay', content: 'Count me in, sounds delicious!' }
-      ],
-      createdAt: '2 hours ago'
-    },
-    {
-      id: 2,
-      sender: { name: 'Vijay', role: 'Parent', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
-      content: 'Finally set up the new garden area! Check the "Sunday Outings" group for our upcoming weekend trip poll. ☀️🏃‍♂️',
-      image: null,
-      likes: 2,
-      likedByMe: false,
-      comments: [],
-      createdAt: 'Yesterday'
-    }
-  ]);
+  const [feedPosts, setFeedPosts] = useState([]);
   const [newPostText, setNewPostText] = useState('');
   const [newPostImage, setNewPostImage] = useState('');
 
-  const [sharedPhotos, setSharedPhotos] = useState([
-    { id: 1, title: 'Summer Vacation 2025 🌊', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500', uploader: 'Samiksha', date: 'June 15, 2025' },
-    { id: 2, title: 'Family Celebration 🎉', url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=500', uploader: 'Vijay', date: 'May 12, 2026' },
-    { id: 3, title: 'Sunday Picnic 🧺', url: 'https://images.unsplash.com/photo-1526218626217-dc65a29bb444?w=500', uploader: 'Varsha', date: '2 weeks ago' },
-    { id: 4, title: 'Garden Projects 🌻', url: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=500', uploader: 'Samiksha', date: '3 days ago' }
-  ]);
+  const [sharedPhotos, setSharedPhotos] = useState([]);       // API-backed memories
   const [newMemoryTitle, setNewMemoryTitle] = useState('');
-  const [newMemoryUrl, setNewMemoryUrl] = useState('');
+  const [newMemoryDesc, setNewMemoryDesc] = useState('');
+  const [newMemoryUrl, setNewMemoryUrl] = useState('');         // Google Drive / external URL
+  const [newMemorySourceType, setNewMemorySourceType] = useState('local'); // 'local'|'googledrive'|'url'
+  const [memoryUploadFile, setMemoryUploadFile] = useState(null); // File object for local upload
+  const [memoryUploadPreview, setMemoryUploadPreview] = useState(''); // data-URL preview
+  const [memoriesLoading, setMemoriesLoading] = useState(false);
+  const [memoriesError, setMemoriesError] = useState('');
+  const [memoryUploading, setMemoryUploading] = useState(false);
+  const memoryFileRef = useRef(null);
 
   const [circlesList, setCirclesList] = useState([
     { id: 1, name: 'Kitchen Duties 🍽️', description: 'Coordinating dish washing, grocery lists, and weekly meal prep.', memberCount: 3 },
@@ -198,6 +236,7 @@ export default function App() {
       fetchUsersList();
       fetchBlockedUsers();
       fetchCallHistory();
+      fetchMemories();
 
       return () => {
         if (socketRef.current) socketRef.current.disconnect();
@@ -526,7 +565,153 @@ export default function App() {
     }
   };
 
+  // ── Memories API Functions ─────────────────────────────────────────────────
 
+  const fetchMemories = async () => {
+    setMemoriesLoading(true);
+    setMemoriesError('');
+    try {
+      const res = await fetch(`${API_BASE}/memories`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSharedPhotos(data);
+      } else {
+        setMemoriesError('Failed to load memories.');
+      }
+    } catch (err) {
+      setMemoriesError('Network error loading memories.');
+    } finally {
+      setMemoriesLoading(false);
+    }
+  };
+
+  // Called when user selects a local file via the file picker
+  const handleMemoryFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setMemoryUploadFile(file);
+    // Generate a local preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setMemoryUploadPreview(previewUrl);
+    setNewMemorySourceType('local');
+    setNewMemoryUrl(''); // clear manual URL if file selected
+  };
+
+  // Submit a new memory — uploads file if local, or uses the provided URL
+  const handleMemorySubmit = async (e) => {
+    e.preventDefault();
+    if (!newMemoryTitle.trim()) return;
+    if (newMemorySourceType === 'local' && !memoryUploadFile) {
+      setMemoriesError('Please select a file to upload.');
+      return;
+    }
+    if ((newMemorySourceType === 'googledrive' || newMemorySourceType === 'url') && !newMemoryUrl.trim()) {
+      setMemoriesError('Please enter a URL.');
+      return;
+    }
+
+    setMemoryUploading(true);
+    setMemoriesError('');
+
+    try {
+      let finalMediaUrl = newMemoryUrl.trim();
+
+      // Step 1: If local file, upload it first via multer endpoint
+      if (newMemorySourceType === 'local' && memoryUploadFile) {
+        const formData = new FormData();
+        formData.append('file', memoryUploadFile);
+        const uploadRes = await fetch(`${API_BASE}/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json();
+          setMemoriesError(err.error || 'File upload failed.');
+          setMemoryUploading(false);
+          return;
+        }
+        const uploadData = await uploadRes.json();
+        finalMediaUrl = uploadData.url;
+      }
+
+      // Step 2: Save memory metadata to DB
+      const memRes = await fetch(`${API_BASE}/memories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: newMemoryTitle.trim(),
+          description: newMemoryDesc.trim(),
+          mediaUrl: finalMediaUrl,
+          sourceType: newMemorySourceType,
+        }),
+      });
+
+      if (memRes.ok) {
+        const newMem = await memRes.json();
+        setSharedPhotos(prev => [newMem, ...prev]);
+        // Reset form
+        setNewMemoryTitle('');
+        setNewMemoryDesc('');
+        setNewMemoryUrl('');
+        setNewMemorySourceType('local');
+        setMemoryUploadFile(null);
+        setMemoryUploadPreview('');
+        if (memoryFileRef.current) memoryFileRef.current.value = '';
+      } else {
+        const err = await memRes.json();
+        setMemoriesError(err.error || 'Failed to save memory.');
+      }
+    } catch (err) {
+      setMemoriesError('Network error. Please try again.');
+    } finally {
+      setMemoryUploading(false);
+    }
+  };
+
+  // Delete a memory (owner only)
+  const handleDeleteMemory = async (memoryId) => {
+    try {
+      const res = await fetch(`${API_BASE}/memories/${memoryId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setSharedPhotos(prev => prev.filter(m => m.id !== memoryId));
+      }
+    } catch (err) {
+      console.error('Delete memory error:', err);
+    }
+  };
+
+  // Resolve a memory's mediaUrl to a displayable URL
+  // Handles: local server paths, Google Drive share links, and external URLs
+  const resolveMemoryMedia = (mediaUrl) => {
+    if (!mediaUrl) return '';
+    // Google Drive share link → convert to embed URL
+    const driveMatch = mediaUrl.match(/\/file\/d\/([^/]+)\//);
+    if (driveMatch) {
+      return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+    // Already absolute URL
+    if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+      return mediaUrl;
+    }
+    // Local server path — prepend backend base
+    return resolveMediaUrl(mediaUrl);
+  };
+
+  // Is this media a video? (checks extension or mimetype hint)
+  const isVideoMedia = (mediaUrl, sourceType) => {
+    if (sourceType === 'googledrive') return false; // always use iframe for Drive
+    const videoExts = ['.mp4', '.webm', '.mov', '.avi', '.mpeg', '.mpg'];
+    return videoExts.some(ext => mediaUrl?.toLowerCase().endsWith(ext));
+  };
 
   const fetchUsersList = async () => {
     try {
@@ -615,37 +800,38 @@ export default function App() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !activeChat) return;
-    
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Data = reader.result;
-      try {
-        const res = await fetch(`${API_BASE}/upload`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ base64Data, filename: file.name })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          if (socketRef.current) {
-            socketRef.current.emit('send_message', {
-              chatId: activeChat.id,
-              senderId: user.id,
-              content: `Shared an image: ${file.name}`,
-              type: 'image',
-              mediaUrl: data.url
-            });
-          }
+
+    // Use FormData (multipart/form-data) — multer on the backend expects this
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        // NOTE: Do NOT set Content-Type — browser sets it automatically with boundary
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const isVideo = file.type.startsWith('video/');
+        if (socketRef.current) {
+          socketRef.current.emit('send_message', {
+            chatId: activeChat.id,
+            senderId: user.id,
+            content: isVideo ? `Shared a video: ${file.name}` : `Shared an image: ${file.name}`,
+            type: isVideo ? 'video' : 'image',
+            mediaUrl: data.url,
+          });
         }
-      } catch (err) {
+      } else {
+        const err = await res.json();
         console.error('File upload error:', err);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('File upload error:', err);
+    }
   };
 
   const fetchCallHistory = async () => {
@@ -987,8 +1173,136 @@ export default function App() {
 
       if (res.ok) {
         fetchStories();
-        setNewStory({ type: 'text', content: '', mediaUrl: '' });
+        setNewStory({ type: 'text', content: '', mediaUrl: 'linear-gradient(135deg, #1e2640 0%, #111827 100%)' });
         setShowStoryCreator(false);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleStoryMediaUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploadingStoryMedia(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ base64Data: reader.result, filename: file.name })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setNewStory(prev => ({ ...prev, mediaUrl: data.url }));
+        }
+      } catch (err) {
+        console.error('Story image upload error:', err);
+      } finally {
+        setIsUploadingStoryMedia(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteStory = async (storyId) => {
+    if (!window.confirm('Delete this status update?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/stories/${storyId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchStories();
+        if (activeStoryViewer) {
+          const { stories: list, index } = activeStoryViewer;
+          if (index < list.length - 1) {
+            setActiveStoryViewer(prev => ({ ...prev, index: index + 1 }));
+          } else {
+            setActiveStoryViewer(null);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReactToStory = async (storyId, emoji) => {
+    try {
+      const res = await fetch(`${API_BASE}/stories/react`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ storyId, emoji })
+      });
+      if (res.ok) {
+        fetchStories();
+        if (activeStoryViewer) {
+          const targetUserId = activeStoryViewer.user.id;
+          const storyContent = activeStoryViewer.stories[activeStoryViewer.index];
+          const chatRes = await fetch(`${API_BASE}/chats`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ isGroup: false, participantIds: [targetUserId] })
+          });
+          if (chatRes.ok) {
+            const chatData = await chatRes.json();
+            if (socketRef.current) {
+              socketRef.current.emit('send_message', {
+                chatId: chatData.id,
+                senderId: user.id,
+                content: `Reacted ${emoji} to status: "${storyContent.content || (storyContent.type === 'image' ? 'Photo Status' : '')}"`,
+                type: 'text'
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSendStoryReply = async (e) => {
+    e.preventDefault();
+    if (!storyReplyText.trim() || !activeStoryViewer) return;
+    
+    const targetUserId = activeStoryViewer.user.id;
+    const storyContent = activeStoryViewer.stories[activeStoryViewer.index];
+    
+    try {
+      const chatRes = await fetch(`${API_BASE}/chats`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ isGroup: false, participantIds: [targetUserId] })
+      });
+      if (chatRes.ok) {
+        const chatData = await chatRes.json();
+        if (socketRef.current) {
+          socketRef.current.emit('send_message', {
+            chatId: chatData.id,
+            senderId: user.id,
+            content: `Replied to status: "${storyReplyText}"\n\n> Status quote: "${storyContent.content || (storyContent.type === 'image' ? 'Photo Status' : '')}"`,
+            type: 'text'
+          });
+        }
+        setStoryReplyText('');
+        setStoryPaused(false);
+        setActiveStoryViewer(null);
+        alert('Reply sent successfully!');
       }
     } catch (err) {
       console.error(err);
@@ -1005,6 +1319,7 @@ export default function App() {
         },
         body: JSON.stringify({ storyId })
       });
+      fetchStories(); // reload views count/list
     } catch (err) {
       console.error(err);
     }
@@ -1015,7 +1330,51 @@ export default function App() {
     const { stories: list, index } = activeStoryViewer;
     const story = list[index];
 
-    // Auto progress status
+    const isOwnStory = story.userId === user.id;
+    const reactions = JSON.parse(story.reactions || '{}');
+    const reactionEntries = Object.entries(reactions);
+
+    const handleTap = (e) => {
+      // Don't trigger tap navigation if user clicked inside drawer, reply box, or reaction buttons
+      if (e.target.closest('.interactive-area')) return;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const clickRatio = x / rect.width;
+      
+      if (clickRatio < 0.35) {
+        // Go to previous story
+        if (index > 0) {
+          setActiveStoryViewer(prev => ({ ...prev, index: index - 1 }));
+          handleViewStory(list[index - 1].id);
+        } else {
+          // Go to previous user's story
+          const activeUserIdx = stories.findIndex(g => g.user.id === activeStoryViewer.user.id);
+          if (activeUserIdx > 0) {
+            const prevGroup = stories[activeUserIdx - 1];
+            setActiveStoryViewer({ user: prevGroup.user, stories: prevGroup.stories, index: prevGroup.stories.length - 1 });
+            handleViewStory(prevGroup.stories[prevGroup.stories.length - 1].id);
+          }
+        }
+      } else {
+        // Go to next story
+        if (index < list.length - 1) {
+          setActiveStoryViewer(prev => ({ ...prev, index: index + 1 }));
+          handleViewStory(list[index + 1].id);
+        } else {
+          // Go to next user's story
+          const activeUserIdx = stories.findIndex(g => g.user.id === activeStoryViewer.user.id);
+          if (activeUserIdx < stories.length - 1) {
+            const nextGroup = stories[activeUserIdx + 1];
+            setActiveStoryViewer({ user: nextGroup.user, stories: nextGroup.stories, index: 0 });
+            handleViewStory(nextGroup.stories[0].id);
+          } else {
+            setActiveStoryViewer(null);
+          }
+        }
+      }
+    };
+
     return (
       <div className="story-overlay-bg">
         <div className="story-viewer-modal animate-fade-in">
@@ -1025,13 +1384,25 @@ export default function App() {
               <div key={s.id} className="story-progress-bg">
                 <div 
                   className={`story-progress-fill ${idx < index ? 'completed' : idx === index ? 'active' : ''}`}
-                  style={{ animationDuration: idx === index ? '5s' : '0s' }}
+                  style={{ 
+                    animationDuration: idx === index ? '5s' : '0s',
+                    animationPlayState: (idx === index && storyPaused) ? 'paused' : 'running'
+                  }}
                   onAnimationEnd={() => {
+                    if (storyPaused) return; // Wait if paused
                     if (index < list.length - 1) {
                       setActiveStoryViewer(prev => ({ ...prev, index: index + 1 }));
                       handleViewStory(list[index + 1].id);
                     } else {
-                      setActiveStoryViewer(null);
+                      // Automatically advance to next user's status or exit
+                      const activeUserIdx = stories.findIndex(g => g.user.id === activeStoryViewer.user.id);
+                      if (activeUserIdx < stories.length - 1) {
+                        const nextGroup = stories[activeUserIdx + 1];
+                        setActiveStoryViewer({ user: nextGroup.user, stories: nextGroup.stories, index: 0 });
+                        handleViewStory(nextGroup.stories[0].id);
+                      } else {
+                        setActiveStoryViewer(null);
+                      }
                     }
                   }}
                 />
@@ -1042,32 +1413,205 @@ export default function App() {
           {/* Viewer Header */}
           <div className="story-viewer-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src={activeStoryViewer.user.profilePhoto || 'https://via.placeholder.com/150'} alt="Avatar" className="avatar sm" />
+              {renderAvatar(activeStoryViewer.user, 'sm')}
               <div>
                 <div style={{ fontWeight: '600' }}>{activeStoryViewer.user.name}</div>
                 <div style={{ fontSize: '11px', opacity: 0.8 }}>{new Date(story.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
               </div>
             </div>
-            <button className="btn-icon" style={{ color: '#fff' }} onClick={() => setActiveStoryViewer(null)}><X size={20} /></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isOwnStory && (
+                <button 
+                  className="btn-icon interactive-area" 
+                  style={{ color: '#ef4444' }} 
+                  onClick={() => handleDeleteStory(story.id)}
+                  title="Delete status"
+                >
+                  <Trash2 size={20} />
+                </button>
+              )}
+              <button className="btn-icon interactive-area" style={{ color: '#fff' }} onClick={() => setActiveStoryViewer(null)}><X size={20} /></button>
+            </div>
           </div>
 
-          {/* Viewers Log */}
-          <div className="story-viewers-tag">
-            <Eye size={14} style={{ marginRight: '5px' }} />
-            <span>{story.StoryViews?.length || 0} views</span>
-          </div>
+          {/* Eye Icon for Viewers */}
+          {isOwnStory && (
+            <div 
+              className="story-viewers-tag interactive-area" 
+              style={{ cursor: 'pointer', zIndex: 30 }}
+              onClick={() => {
+                setStoryPaused(true);
+                setShowStoryViewersList(true);
+              }}
+            >
+              <Eye size={14} style={{ marginRight: '5px' }} />
+              <span>{story.StoryViews?.length || 0} views</span>
+            </div>
+          )}
 
           {/* Content Box */}
-          <div className="story-content-body">
+          <div className="story-content-body" onClick={handleTap} style={{ cursor: 'pointer' }}>
             {story.type === 'text' ? (
-              <div className="story-text-container">{story.content}</div>
+              <div 
+                className="story-text-container" 
+                style={{ 
+                  background: (story.mediaUrl && story.mediaUrl.startsWith('linear-gradient')) ? story.mediaUrl : undefined 
+                }}
+              >
+                {story.content}
+              </div>
             ) : (
               <div className="story-image-container">
-                <img src={story.mediaUrl} alt="Story Content" />
+                <img src={resolveMediaUrl(story.mediaUrl)} alt="Story Content" />
                 {story.content && <div className="story-image-caption">{story.content}</div>}
               </div>
             )}
+
+            {/* Float Story Reactions Display */}
+            {reactionEntries.length > 0 && (
+              <div 
+                className="interactive-area"
+                style={{
+                  position: 'absolute',
+                  bottom: isOwnStory ? '60px' : '150px',
+                  left: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  maxWidth: '80%'
+                }}
+              >
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontWeight: '700' }}>Story Reactions</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {reactionEntries.map(([uid, rEmoji]) => {
+                    // Look up user name
+                    const rUser = usersList.find(u => u.id === uid) || (uid === user.id ? user : null);
+                    return (
+                      <span key={uid} title={rUser?.name || 'User'} style={{ fontSize: '16px', background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <span>{rEmoji}</span>
+                        <span style={{ fontSize: '10px' }}>{rUser?.name?.split(' ')[0]}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Quick Reaction & Reply Box (Only for others' stories) */}
+          {!isOwnStory && (
+            <div className="interactive-area" style={{
+              position: 'absolute',
+              bottom: 0, left: 0, right: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.4))',
+              padding: '16px 20px 30px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              zIndex: 30
+            }}>
+              {/* Emojis Reactions row */}
+              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                {['❤️', '😂', '😮', '😢', '🙏', '👍'].map(em => (
+                  <button 
+                    key={em} 
+                    style={{ fontSize: '24px', background: 'none', border: 'none', cursor: 'pointer', transition: 'transform 0.15s' }}
+                    className="hover-scale"
+                    onClick={() => handleReactToStory(story.id, em)}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+
+              {/* Reply form */}
+              <form onSubmit={handleSendStoryReply} style={{ display: 'flex', gap: '10px' }}>
+                <input 
+                  type="text" 
+                  placeholder={`Reply to ${activeStoryViewer.user.name}...`} 
+                  style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '24px',
+                    padding: '10px 16px',
+                    color: '#fff',
+                    outline: 'none',
+                    fontSize: '14px'
+                  }}
+                  value={storyReplyText}
+                  onChange={e => setStoryReplyText(e.target.value)}
+                  onFocus={() => setStoryPaused(true)}
+                  onBlur={() => {
+                    if (!storyReplyText.trim()) setStoryPaused(false);
+                  }}
+                />
+                <button 
+                  type="submit" 
+                  className="btn-primary" 
+                  style={{ borderRadius: '50%', width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Send size={16} />
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Viewers Drawer list */}
+          {isOwnStory && showStoryViewersList && (
+            <div 
+              className="modal-backdrop-blur interactive-area"
+              style={{ position: 'absolute', zIndex: 100 }}
+              onClick={() => {
+                setShowStoryViewersList(false);
+                setStoryPaused(false);
+              }}
+            >
+              <div 
+                className="modal-card animate-slide-up"
+                style={{ 
+                  position: 'absolute', bottom: 0, left: 0, right: 0, width: '100%', maxWidth: '480px', margin: '0 auto',
+                  borderRadius: '20px 20px 0 0', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', marginBottom: '16px' }}>
+                  <h4 style={{ fontWeight: '700', fontSize: '15px' }}>Views ({story.StoryViews?.length || 0})</h4>
+                  <button className="btn-icon" onClick={() => {
+                    setShowStoryViewersList(false);
+                    setStoryPaused(false);
+                  }}><X size={20} /></button>
+                </div>
+
+                <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(!story.StoryViews || story.StoryViews.length === 0) ? (
+                    <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                      No views yet.
+                    </div>
+                  ) : (
+                    story.StoryViews.map(view => (
+                      <div key={view.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {renderAvatar(view.User, 'sm')}
+                          <div>
+                            <div style={{ fontWeight: '600', fontSize: '13px' }}>{view.User?.name}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{view.User?.role}</div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                          {new Date(view.viewedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     );
@@ -1436,7 +1980,7 @@ export default function App() {
               boxShadow: '0 8px 16px rgba(99, 102, 241, 0.4)',
               border: '2px solid rgba(255, 255, 255, 0.8)'
             }}>
-              <img src="/logo.png" alt="FamilySphere Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.35)' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150'; }} />
+              <img src="/logo.png" alt="FamilySphere Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.35)' }} onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.parentNode.style.background = 'var(--gradient-premium)'; e.target.parentNode.style.display = 'flex'; e.target.parentNode.style.alignItems = 'center'; e.target.parentNode.style.justifyContent = 'center'; e.target.parentNode.innerHTML = '<span style="color:#fff;font-weight:800;font-size:24px">F</span>'; }} />
             </div>
             <h1 style={{ fontFamily: 'Outfit', fontSize: '28px', color: '#1e293b', fontWeight: '800' }}>FamilySphere</h1>
             <p style={{ color: '#64748b', fontSize: '14px', marginTop: '4px' }}>Secure AI-Powered Family Communications</p>
@@ -1596,7 +2140,7 @@ export default function App() {
           if (!newPostText.trim()) return;
           const newPost = {
             id: feedPosts.length + 1,
-            sender: { name: user.name, role: user.role, avatar: user.profilePhoto || 'https://via.placeholder.com/150' },
+            sender: { name: user.name, role: user.role, avatar: user.profilePhoto || '' },
             content: newPostText,
             image: newPostImage.trim() || null,
             likes: 0,
@@ -1635,7 +2179,7 @@ export default function App() {
             <div key={post.id} className="glass-card" style={{ padding: '24px', borderRadius: '20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', boxShadow: 'var(--shadow-sm)' }}>
               {/* Post Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                <img src={post.sender.avatar} className="avatar" alt="Avatar" />
+                {renderAvatar({ name: post.sender.name, role: post.sender.role, profilePhoto: post.sender.avatar }, 'md')}
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: '700' }}>{post.sender.name}</h4>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{post.sender.role} • {post.createdAt}</p>
@@ -1715,75 +2259,252 @@ export default function App() {
 
   const renderMemoriesWorkspace = () => {
     return (
-      <div style={{ flex: 1, padding: '40px', overflowY: 'auto', background: 'transparent', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px', alignItems: 'center' }}>
+      <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', background: 'transparent', display: 'flex', flexDirection: 'column', gap: '24px', minHeight: 0 }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-glass)', paddingBottom: '14px', alignItems: 'center' }}>
           <div>
-            <h2 style={{ fontSize: '24px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)' }}>Shared Memories Album</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>A high-resolution visual repository compiling graduation days, vacations, and family picnics.</p>
+            <h2 style={{ fontSize: '24px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)' }}>
+              📸 Shared Memories Album
+            </h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+              Upload photos &amp; videos, or link from Google Drive. All family memories in one place.
+            </p>
           </div>
-          <Sparkles size={28} style={{ color: 'var(--color-primary)' }} />
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button
+              onClick={fetchMemories}
+              style={{ padding: '8px 16px', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-glass)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+            >
+              🔄 Refresh
+            </button>
+            <Sparkles size={26} style={{ color: 'var(--color-primary)' }} />
+          </div>
         </div>
 
-        {/* Share Memory Form */}
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          if (!newMemoryTitle.trim() || !newMemoryUrl.trim()) return;
-          const newMem = {
-            id: sharedPhotos.length + 1,
-            title: newMemoryTitle,
-            url: newMemoryUrl,
-            uploader: user.name,
-            date: 'Just now'
-          };
-          setSharedPhotos([newMem, ...sharedPhotos]);
-          setNewMemoryTitle('');
-          setNewMemoryUrl('');
-        }} style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-secondary)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-glass)', maxWidth: '720px' }}>
+        {/* Error banner */}
+        {memoriesError && (
+          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '12px 16px', color: '#ef4444', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>⚠️ {memoriesError}</span>
+            <button onClick={() => setMemoriesError('')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+          </div>
+        )}
+
+        {/* Add Memory Form */}
+        <form onSubmit={handleMemorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-secondary)', padding: '22px', borderRadius: '20px', border: '1px solid var(--border-glass)', maxWidth: '780px' }}>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>+ Add a New Memory</div>
+
+          {/* Title + Description */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <input 
-              type="text" 
-              placeholder="Memory title (e.g. Picnic)..." 
-              className="input-field" 
+            <input
+              type="text"
+              placeholder="Memory title (e.g. Picnic 2024)…"
+              className="input-field"
               style={{ background: 'var(--bg-tertiary)' }}
               value={newMemoryTitle}
               onChange={(e) => setNewMemoryTitle(e.target.value)}
               required
             />
-            <input 
-              type="text" 
-              placeholder="Photo URL..." 
-              className="input-field" 
+            <input
+              type="text"
+              placeholder="Description (optional)…"
+              className="input-field"
+              style={{ background: 'var(--bg-tertiary)' }}
+              value={newMemoryDesc}
+              onChange={(e) => setNewMemoryDesc(e.target.value)}
+            />
+          </div>
+
+          {/* Source type toggle */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { key: 'local', label: '📁 Upload File' },
+              { key: 'googledrive', label: '🔗 Google Drive' },
+              { key: 'url', label: '🌐 External URL' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setNewMemorySourceType(key); setMemoryUploadFile(null); setMemoryUploadPreview(''); setNewMemoryUrl(''); }}
+                style={{
+                  padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                  border: newMemorySourceType === key ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)',
+                  background: newMemorySourceType === key ? 'var(--color-primary)' : 'var(--bg-tertiary)',
+                  color: newMemorySourceType === key ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Local file upload */}
+          {newMemorySourceType === 'local' && (
+            <div
+              onClick={() => memoryFileRef.current?.click()}
+              style={{
+                border: '2px dashed var(--border-glass)', borderRadius: '14px', padding: '20px',
+                textAlign: 'center', cursor: 'pointer', background: 'var(--bg-tertiary)',
+                transition: 'border-color 0.2s ease',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-glass)'}
+            >
+              {memoryUploadPreview ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
+                  {memoryUploadFile?.type?.startsWith('video/') ? (
+                    <video src={memoryUploadPreview} style={{ height: '60px', borderRadius: '8px' }} muted />
+                  ) : (
+                    <img src={memoryUploadPreview} alt="preview" style={{ height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+                  )}
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{memoryUploadFile?.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{(memoryUploadFile?.size / 1024 / 1024).toFixed(2)} MB · Click to change</div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '28px', marginBottom: '6px' }}>📤</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Click to upload a photo or video</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', opacity: 0.7 }}>JPEG, PNG, GIF, WebP, MP4, WebM, MOV · Max 50MB</div>
+                </div>
+              )}
+              <input
+                ref={memoryFileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
+                style={{ display: 'none' }}
+                onChange={handleMemoryFileSelect}
+              />
+            </div>
+          )}
+
+          {/* Google Drive / External URL input */}
+          {(newMemorySourceType === 'googledrive' || newMemorySourceType === 'url') && (
+            <input
+              type="url"
+              placeholder={newMemorySourceType === 'googledrive' ? 'Paste Google Drive share link…' : 'Paste external image/video URL…'}
+              className="input-field"
               style={{ background: 'var(--bg-tertiary)' }}
               value={newMemoryUrl}
               onChange={(e) => setNewMemoryUrl(e.target.value)}
               required
             />
-          </div>
-          <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>
-            Add Memory Photo
+          )}
+
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={memoryUploading}
+            style={{ alignSelf: 'flex-end', opacity: memoryUploading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            {memoryUploading ? '⏳ Saving…' : '✨ Add Memory'}
           </button>
         </form>
 
-        {/* Grid of Shared Media */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-          {sharedPhotos.map(photo => (
-            <div key={photo.id} className="glass-card" style={{ borderRadius: '20px', overflow: 'hidden', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', boxShadow: 'var(--shadow-sm)' }}>
-              <div style={{ position: 'relative', height: '220px', width: '100%' }}>
-                <img src={photo.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Memory" />
-                <span style={{ position: 'absolute', bottom: '12px', left: '12px', background: 'rgba(0,0,0,0.65)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: '600' }}>
-                  Uploaded By: {photo.uploader}
-                </span>
-              </div>
-              <div style={{ padding: '18px' }}>
-                <h4 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>{photo.title}</h4>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Date: {photo.date}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Loading state */}
+        {memoriesLoading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+            ⏳ Loading memories…
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!memoriesLoading && sharedPhotos.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: '12px', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '52px' }}>📷</div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>No memories yet</div>
+            <div style={{ fontSize: '13px' }}>Upload your first family photo or video above!</div>
+          </div>
+        )}
+
+        {/* Memory Grid */}
+        {!memoriesLoading && sharedPhotos.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '20px' }}>
+            {sharedPhotos.map(memory => {
+              const mediaUrl = resolveMemoryMedia(memory.mediaUrl);
+              const isVideo = isVideoMedia(memory.mediaUrl, memory.sourceType);
+              const isDrive = memory.sourceType === 'googledrive';
+              const uploaderName = memory.uploader?.name || 'Family';
+              const isOwner = memory.userId === user?.id;
+
+              return (
+                <div
+                  key={memory.id}
+                  className="glass-card"
+                  style={{ borderRadius: '20px', overflow: 'hidden', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', boxShadow: 'var(--shadow-sm)', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
+                >
+                  {/* Media area */}
+                  <div style={{ position: 'relative', height: '220px', width: '100%', background: 'var(--bg-tertiary)' }}>
+                    {isDrive ? (
+                      <iframe
+                        src={mediaUrl}
+                        style={{ width: '100%', height: '100%', border: 'none' }}
+                        allow="autoplay"
+                        title={memory.title}
+                      />
+                    ) : isVideo ? (
+                      <video
+                        src={mediaUrl}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        controls
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={mediaUrl}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        alt={memory.title}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    )}
+
+                    {/* Source badge */}
+                    <span style={{ position: 'absolute', top: '10px', left: '10px', background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '3px 10px', borderRadius: '20px', fontSize: '9px', fontWeight: '700', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                      {isDrive ? '📁 Drive' : isVideo ? '🎬 Video' : '📷 Photo'}
+                    </span>
+
+                    {/* Delete button (owner only) */}
+                    {isOwner && (
+                      <button
+                        onClick={() => handleDeleteMemory(memory.id)}
+                        title="Delete memory"
+                        style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(239,68,68,0.85)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontSize: '12px', transition: 'opacity 0.2s' }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.85'}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+
+                    {/* Uploader badge */}
+                    <span style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(0,0,0,0.65)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: '600' }}>
+                      By: {uploaderName}
+                    </span>
+                  </div>
+
+                  {/* Info area */}
+                  <div style={{ padding: '16px 18px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>{memory.title}</h4>
+                    {memory.description && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', lineHeight: '1.5' }}>{memory.description}</p>
+                    )}
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.7 }}>
+                      {new Date(memory.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
+
 
   const renderCirclesWorkspace = () => {
     return (
@@ -1880,7 +2601,7 @@ export default function App() {
             </h3>
             
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-              <img src={user.profilePhoto || 'https://via.placeholder.com/150'} className="avatar lg" alt="Avatar" />
+              {renderAvatar(user, 'lg')}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Profile Photo URL</label>
                 <input 
@@ -2003,7 +2724,7 @@ export default function App() {
                     {blockedUsers.map(u => (
                       <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <img src={u.profilePhoto || 'https://via.placeholder.com/150'} className="avatar sm" alt={u.name} />
+                          {renderAvatar(u, 'sm')}
                           <div>
                             <div style={{ fontWeight: '600', fontSize: '13px' }}>{u.name}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.role}</div>
@@ -2168,7 +2889,7 @@ export default function App() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: '1px solid var(--border-glass)'
             }}>
-              <img src="/logo.png" alt="FamilySphere Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.35)' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150'; }} />
+              <img src="/logo.png" alt="FamilySphere Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.35)' }} onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.parentNode.style.background = 'var(--gradient-premium)'; e.target.parentNode.style.display = 'flex'; e.target.parentNode.style.alignItems = 'center'; e.target.parentNode.style.justifyContent = 'center'; e.target.parentNode.innerHTML = '<span style="color:#fff;font-weight:800;font-size:16px">F</span>'; }} />
             </div>
             <h2 style={{ fontSize: '20px', fontFamily: 'Outfit', fontWeight: '800' }}>FamilySphere</h2>
           </div>
@@ -2198,12 +2919,7 @@ export default function App() {
         }}>
           {/* Avatar with live dot */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <img
-              src={user.profilePhoto || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=6366f1&color=fff'}
-              alt="My Avatar"
-              style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(99,102,241,0.5)' }}
-              onError={e => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=6366f1&color=fff'; }}
-            />
+            {renderAvatar(user, 'md', { border: '2px solid rgba(99,102,241,0.5)' })}
             {/* Green online dot */}
             <div style={{
               position: 'absolute', bottom: '1px', right: '1px',
@@ -2286,12 +3002,7 @@ export default function App() {
                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                   {/* Avatar + green dot */}
                   <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <img
-                      src={u.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=6366f1&color=fff`}
-                      alt={u.name}
-                      style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #22c55e' }}
-                      onError={e => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=6366f1&color=fff`; }}
-                    />
+                    {renderAvatar(u, 'sm', { border: '1.5px solid #22c55e', width: '28px', height: '28px' })}
                     <span style={{
                       position: 'absolute', bottom: '0px', right: '0px',
                       width: '8px', height: '8px', borderRadius: '50%',
@@ -2351,7 +3062,17 @@ export default function App() {
                     onClick={() => setActiveChat(chat)}
                   >
                     <div className="avatar-container">
-                      <img src={chat.isGroup ? chat.avatar : displayMember?.profilePhoto || 'https://via.placeholder.com/150'} alt="Avatar" className="avatar" />
+                      {chat.isGroup ? (
+                        chat.avatar && !chat.avatar.includes('placeholder') ? (
+                          <img src={resolveMediaUrl(chat.avatar)} className="avatar" alt="Avatar" />
+                        ) : (
+                          <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', color: '#fff', fontWeight: '800', borderRadius: '50%' }}>
+                            {chat.name ? chat.name.charAt(0).toUpperCase() : 'G'}
+                          </div>
+                        )
+                      ) : (
+                        renderAvatar(displayMember, 'md')
+                      )}
                       {!chat.isGroup && displayMember?.role !== 'AI' && (
                         <div className={`status-dot ${displayMember?.isOnline ? '' : 'offline'}`}></div>
                       )}
@@ -2388,49 +3109,97 @@ export default function App() {
             <div style={{ padding: '20px', flex: 1, overflowY: 'auto', minHeight: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Status Updates</h3>
-                <button className="btn-primary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={() => setShowStoryCreator(true)}>
+                <button className="btn-primary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={() => {
+                  setNewStory({ type: 'text', content: '', mediaUrl: 'linear-gradient(135deg, #1e2640 0%, #111827 100%)' });
+                  setShowStoryCreator(true);
+                }}>
                   Add Status
                 </button>
               </div>
 
               {/* Personal Status card */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '16px', marginBottom: '24px' }}>
-                <img src={user.profilePhoto || 'https://via.placeholder.com/150'} className="avatar" alt="My Profile" />
-                <div>
-                  <div style={{ fontWeight: '600', fontSize: '14px' }}>My Status</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Share updates for 24 hours</div>
-                </div>
-              </div>
+              {(() => {
+                const myGroup = stories.find(g => g.user.id === user.id);
+                const hasMyStories = myGroup && myGroup.stories.length > 0;
+                const latestStory = hasMyStories ? myGroup.stories[0] : null;
+                const hasUnviewedSelf = hasMyStories && myGroup.stories.some(s => !s.StoryViews?.some(v => v.userId === user.id));
+                const ringColorSelf = hasMyStories ? (hasUnviewedSelf ? 'var(--color-primary)' : '#94a3b8') : 'transparent';
+                
+                return (
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '16px', marginBottom: '24px', cursor: 'pointer' }}
+                    onClick={() => {
+                      if (hasMyStories) {
+                        setActiveStoryViewer({ user: user, stories: myGroup.stories, index: 0 });
+                        handleViewStory(myGroup.stories[0].id);
+                      } else {
+                        setNewStory({ type: 'text', content: '', mediaUrl: 'linear-gradient(135deg, #1e2640 0%, #111827 100%)' });
+                        setShowStoryCreator(true);
+                      }
+                    }}
+                  >
+                    <div style={{
+                      width: '48px', height: '48px', borderRadius: '50%', 
+                      border: hasMyStories ? `2.5px solid ${ringColorSelf}` : '2.5px dashed var(--text-tertiary)', 
+                      padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'
+                    }}>
+                      {renderAvatar(user, 'sm', { width: '38px', height: '38px' })}
+                      {!hasMyStories && (
+                        <div style={{
+                          position: 'absolute', bottom: '-2px', right: '-2px',
+                          background: 'var(--color-primary)', color: '#fff',
+                          width: '18px', height: '18px', borderRadius: '50%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '12px', fontWeight: 'bold', border: '2px solid var(--bg-tertiary)'
+                        }}>
+                          +
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: '600', fontSize: '14px' }}>My Status</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {latestStory ? `Updated at ${new Date(latestStory.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Tap to add status update'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <h4 style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Recent Updates</h4>
               
-              {stories.length === 0 ? (
+              {stories.filter(g => g.user.id !== user.id).length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
                   No recent status updates from the family.
                 </div>
               ) : (
-                stories.map(group => (
-                  <div 
-                    key={group.user.id} 
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border-glass)', cursor: 'pointer' }}
-                    onClick={() => {
-                      setActiveStoryViewer({ user: group.user, stories: group.stories, index: 0 });
-                      handleViewStory(group.stories[0].id);
-                    }}
-                  >
-                    <div style={{
-                      width: '48px', height: '48px', borderRadius: '50%', border: '2.5px solid var(--color-primary)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      <img src={group.user.profilePhoto || 'https://via.placeholder.com/150'} className="avatar sm" style={{ width: '38px', height: '38px' }} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: '600', fontSize: '14px' }}>{group.user.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        {new Date(group.stories[0].createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                stories.filter(g => g.user.id !== user.id).map(group => {
+                  const hasUnviewed = group.stories.some(s => !s.StoryViews?.some(v => v.userId === user.id));
+                  const ringColor = hasUnviewed ? 'var(--color-primary)' : '#94a3b8';
+                  
+                  return (
+                    <div 
+                      key={group.user.id} 
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border-glass)', cursor: 'pointer' }}
+                      onClick={() => {
+                        setActiveStoryViewer({ user: group.user, stories: group.stories, index: 0 });
+                        handleViewStory(group.stories[0].id);
+                      }}
+                    >
+                      <div style={{
+                        width: '48px', height: '48px', borderRadius: '50%', border: `2.5px solid ${ringColor}`, padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {renderAvatar(group.user, 'sm', { width: '38px', height: '38px' })}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{group.user.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          {new Date(group.stories[0].createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}
@@ -2470,11 +3239,7 @@ export default function App() {
                   return (
                     <div key={call.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-glass)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <img 
-                          src={partner.profilePhoto || 'https://via.placeholder.com/150'} 
-                          className="avatar sm" 
-                          alt={partner.name}
-                        />
+                        {renderAvatar(partner, 'sm')}
                         <div>
                           <div style={{ fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             {partner.name}
@@ -2604,7 +3369,7 @@ export default function App() {
                 if (!newPostText.trim()) return;
                 const newPost = {
                   id: feedPosts.length + 1,
-                  sender: { name: user.name, role: user.role, avatar: user.profilePhoto || 'https://via.placeholder.com/150' },
+                  sender: { name: user.name, role: user.role, avatar: user.profilePhoto || '' },
                   content: newPostText,
                   image: newPostImage.trim() || null,
                   likes: 0,
@@ -2925,11 +3690,17 @@ export default function App() {
                   <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} />
                 </button>
 
-                <img 
-                  src={activeChat.isGroup ? activeChat.avatar : activeChat.Users.find(u => u.id !== user.id)?.profilePhoto || 'https://via.placeholder.com/150'} 
-                  className="avatar sm" 
-                  alt="Avatar" 
-                />
+                {activeChat.isGroup ? (
+                  activeChat.avatar && !activeChat.avatar.includes('placeholder') ? (
+                    <img src={resolveMediaUrl(activeChat.avatar)} className="avatar sm" alt="Avatar" />
+                  ) : (
+                    <div className="avatar sm" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', color: '#fff', fontWeight: '800', borderRadius: '50%' }}>
+                      {activeChat.name ? activeChat.name.charAt(0).toUpperCase() : 'G'}
+                    </div>
+                  )
+                ) : (
+                  renderAvatar(activeChat.Users.find(u => u.id !== user.id), 'sm')
+                )}
                 
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: '600' }}>
@@ -3399,7 +4170,7 @@ export default function App() {
                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '10px', cursor: 'pointer' }}
                     onClick={() => handleStartChat(u.id)}
                   >
-                    <img src={u.profilePhoto || 'https://via.placeholder.com/150'} className="avatar sm" />
+                    {renderAvatar(u, 'sm')}
                     <div>
                       <div style={{ fontWeight: '600', fontSize: '14px' }}>{u.name}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{u.role}</div>
@@ -3415,9 +4186,9 @@ export default function App() {
       {/* B. Create Status Story Modal */}
       {showStoryCreator && (
         <div className="modal-backdrop-blur">
-          <div className="modal-card animate-fade-in">
+          <div className="modal-card animate-fade-in" style={{ width: '95%', maxWidth: '460px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Create Status</h3>
+              <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Create Status Update</h3>
               <button className="btn-icon" onClick={() => setShowStoryCreator(false)}><X size={20} /></button>
             </div>
 
@@ -3427,41 +4198,118 @@ export default function App() {
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button 
                     type="button" 
-                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: newStory.type === 'text' ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)' }}
-                    onClick={() => setNewStory({ ...newStory, type: 'text', mediaUrl: '' })}
+                    style={{ 
+                      flex: 1, padding: '10px', borderRadius: '8px', 
+                      background: newStory.type === 'text' ? 'var(--color-primary-light)' : 'transparent',
+                      color: newStory.type === 'text' ? 'var(--color-primary)' : 'var(--text-primary)',
+                      border: newStory.type === 'text' ? '2.5px solid var(--color-primary)' : '1px solid var(--border-glass)',
+                      fontWeight: '700'
+                    }}
+                    onClick={() => setNewStory({ ...newStory, type: 'text', mediaUrl: 'linear-gradient(135deg, #1e2640 0%, #111827 100%)' })}
                   >
                     Text Status
                   </button>
                   <button 
                     type="button" 
-                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: newStory.type === 'image' ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)' }}
-                    onClick={() => setNewStory({ ...newStory, type: 'image' })}
+                    style={{ 
+                      flex: 1, padding: '10px', borderRadius: '8px', 
+                      background: newStory.type === 'image' ? 'var(--color-primary-light)' : 'transparent',
+                      color: newStory.type === 'image' ? 'var(--color-primary)' : 'var(--text-primary)',
+                      border: newStory.type === 'image' ? '2.5px solid var(--color-primary)' : '1px solid var(--border-glass)',
+                      fontWeight: '700'
+                    }}
+                    onClick={() => setNewStory({ ...newStory, type: 'image', mediaUrl: '' })}
                   >
                     Photo Status
                   </button>
                 </div>
               </div>
 
-              {newStory.type === 'image' && (
+              {newStory.type === 'text' ? (
                 <div>
-                  <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Image URL</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Choose Background Color</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    {[
+                      'linear-gradient(135deg, #1e2640 0%, #111827 100%)',
+                      'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                      'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)',
+                      'linear-gradient(135deg, #059669 0%, #34d399 100%)',
+                      'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
+                      'linear-gradient(135deg, #0284c7 0%, #60a5fa 100%)',
+                    ].map(grad => (
+                      <button
+                        key={grad}
+                        type="button"
+                        style={{
+                          width: '32px', height: '32px', borderRadius: '50%',
+                          background: grad, cursor: 'pointer',
+                          border: newStory.mediaUrl === grad ? '2px solid #fff' : '1px solid rgba(0,0,0,0.2)',
+                          boxShadow: newStory.mediaUrl === grad ? '0 0 0 2px var(--color-primary)' : 'none'
+                        }}
+                        onClick={() => setNewStory({ ...newStory, mediaUrl: grad })}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Realtime preview */}
+                  <div style={{
+                    width: '100%', height: '100px', borderRadius: '12px', background: newStory.mediaUrl,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+                    color: '#fff', fontSize: '15px', fontWeight: '700', textOverflow: 'ellipsis',
+                    overflow: 'hidden', whiteSpace: 'normal', textAlign: 'center', marginBottom: '10px'
+                  }}>
+                    {newStory.content || 'Status Text Preview'}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Status Photo</label>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <input 
+                      type="file" 
+                      id="story-image-upload-input"
+                      style={{ display: 'none' }} 
+                      accept="image/*" 
+                      onChange={handleStoryMediaUpload} 
+                    />
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', flex: 1, padding: '10px', justifyContent: 'center' }}
+                      onClick={() => document.getElementById('story-image-upload-input')?.click()}
+                      disabled={isUploadingStoryMedia}
+                    >
+                      <Camera size={16} />
+                      {isUploadingStoryMedia ? 'Uploading...' : 'Upload Local Photo'}
+                    </button>
+                  </div>
+                  
                   <input 
                     type="text" 
-                    placeholder="https://images.unsplash.com/..." 
+                    placeholder="Or paste an image URL here..." 
                     className="input-field"
                     value={newStory.mediaUrl}
                     onChange={e => setNewStory({ ...newStory, mediaUrl: e.target.value })}
-                    required
                   />
+
+                  {newStory.mediaUrl && (
+                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                      <img 
+                        src={resolveMediaUrl(newStory.mediaUrl)} 
+                        alt="Preview" 
+                        style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border-glass)' }} 
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>
-                  {newStory.type === 'text' ? 'Status Content' : 'Image Caption'}
+                  {newStory.type === 'text' ? 'Status Content *' : 'Image Caption (Optional)'}
                 </label>
                 <textarea 
-                  placeholder={newStory.type === 'text' ? "What's on your mind?" : "Caption goes here..."}
+                  placeholder={newStory.type === 'text' ? "What's on your mind?..." : "Caption..."}
                   className="input-field"
                   style={{ minHeight: '80px', resize: 'none' }}
                   value={newStory.content}
@@ -3470,8 +4318,13 @@ export default function App() {
                 />
               </div>
 
-              <button type="submit" className="btn-primary" style={{ justifyContent: 'center', marginTop: '6px' }}>
-                Publish Status
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                style={{ justifyContent: 'center', marginTop: '6px' }}
+                disabled={isUploadingStoryMedia || (newStory.type === 'image' && !newStory.mediaUrl)}
+              >
+                Publish Status Update
               </button>
             </form>
           </div>

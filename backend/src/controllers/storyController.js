@@ -121,3 +121,58 @@ export const viewStory = async (req, res) => {
     res.status(500).json({ error: 'Server error logging story view' });
   }
 };
+
+export const reactToStory = async (req, res) => {
+  try {
+    const { storyId, emoji } = req.body;
+    const userId = req.user.id;
+    
+    const story = await Story.findByPk(storyId);
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+    
+    let currentReactions = {};
+    try {
+      currentReactions = JSON.parse(story.reactions || '{}');
+    } catch (e) {
+      currentReactions = {};
+    }
+    
+    if (emoji) {
+      currentReactions[userId] = emoji;
+    } else {
+      delete currentReactions[userId];
+    }
+    
+    story.reactions = JSON.stringify(currentReactions);
+    await story.save();
+    
+    res.json(story);
+  } catch (error) {
+    console.error('React to story error:', error);
+    res.status(500).json({ error: 'Server error reacting to story' });
+  }
+};
+
+export const deleteStory = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const userId = req.user.id;
+    
+    const story = await Story.findByPk(storyId);
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+    
+    if (story.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized to delete this story' });
+    }
+    
+    await story.destroy();
+    res.json({ message: 'Story deleted successfully' });
+  } catch (error) {
+    console.error('Delete story error:', error);
+    res.status(500).json({ error: 'Server error deleting story' });
+  }
+};

@@ -58,7 +58,7 @@ export const runSeeding = async (force = true) => {
     if (force) {
       await sequelize.sync({ force: true });
     } else {
-      await sequelize.sync({ alter: true });
+      await sequelize.sync();
     }
     console.log('Database synced.');
 
@@ -93,7 +93,7 @@ export const runSeeding = async (force = true) => {
         user.name = item.Name || user.name;
         user.phone = item.Phone || user.phone;
         user.role = item.Role || user.role;
-        user.profilePhoto = item.ProfilePhoto || user.profilePhoto;
+        user.profilePhoto = null; // No default mock profile photos
         user.plainPassword = item.Password || user.plainPassword;
         await user.save();
         console.log(`Updated existing user from CSV: ${user.name} (${user.role})`);
@@ -107,7 +107,7 @@ export const runSeeding = async (force = true) => {
           passwordHash,
           plainPassword: item.Password || 'Password123',
           role: item.Role || 'Parent',
-          profilePhoto: item.ProfilePhoto || null,
+          profilePhoto: null, // No default mock profile photos
         });
         console.log(`Created new user from CSV: ${user.name} (${user.role})`);
       }
@@ -120,7 +120,7 @@ export const runSeeding = async (force = true) => {
       familyGroup = await Chat.create({
         name: 'The Family Sphere 🏡',
         isGroup: true,
-        avatar: 'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?w=150',
+        avatar: null, // No default group avatar
       });
       console.log('Created Family Group Chat.');
     }

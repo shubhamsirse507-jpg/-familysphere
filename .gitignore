@@ -43,3 +43,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local test & helper files
+powershell.cmd
+test_memories.mjs
+

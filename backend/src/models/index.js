@@ -185,6 +185,10 @@ export const Story = sequelize.define('Story', {
     type: DataTypes.DATE,
     allowNull: false,
   },
+  reactions: {
+    type: DataTypes.TEXT,
+    defaultValue: '{}',
+  },
 });
 
 // --- StoryView Model ---
@@ -226,6 +230,32 @@ export const Call = sequelize.define('Call', {
 });
 
 
+
+// --- Memory Model (Shared family photo/video album) ---
+export const Memory = sequelize.define('Memory', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    defaultValue: '',
+  },
+  mediaUrl: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+  },
+  sourceType: {
+    type: DataTypes.STRING, // 'local', 'googledrive', 'url'
+    defaultValue: 'local',
+  },
+});
 
 // --- BlockedUser Model ---
 export const BlockedUser = sequelize.define('BlockedUser', {
@@ -302,6 +332,10 @@ User.hasMany(BlockedUser, { as: 'blockedUsers', foreignKey: 'blockerId', onDelet
 User.hasMany(BlockedUser, { as: 'blockedByUsers', foreignKey: 'blockedId', onDelete: 'CASCADE' });
 BlockedUser.belongsTo(User, { as: 'blocker', foreignKey: 'blockerId' });
 BlockedUser.belongsTo(User, { as: 'blocked', foreignKey: 'blockedId' });
+
+// Memories
+User.hasMany(Memory, { as: 'memories', foreignKey: 'userId', onDelete: 'CASCADE' });
+Memory.belongsTo(User, { as: 'uploader', foreignKey: 'userId' });
 
 // Sync database function helper
 export const syncDatabase = async (force = false) => {

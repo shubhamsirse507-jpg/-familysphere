@@ -17,11 +17,15 @@ import {
 } from '../controllers/chatController.js';
 import { blockUser, unblockUser, getBlockedUsers } from '../controllers/userController.js';
 import { uploadMedia } from '../controllers/uploadController.js';
+import { uploadMiddleware, handleUploadError } from '../middleware/upload.js';
+import { getMemories, createMemory, deleteMemory } from '../controllers/memoriesController.js';
 import { createCallLog, updateCallLog, getCallHistory } from '../controllers/callController.js';
 import {
   createStory,
   getActiveStories,
   viewStory,
+  reactToStory,
+  deleteStory,
 } from '../controllers/storyController.js';
 
 import {
@@ -54,8 +58,13 @@ router.post('/users/block', protect, blockUser);
 router.post('/users/unblock', protect, unblockUser);
 router.get('/users/blocked', protect, getBlockedUsers);
 
-// --- Media Upload ---
-router.post('/upload', protect, uploadMedia);
+// --- Media Upload (multer secured: whitelist MIME, size cap, per-user dir) ---
+router.post('/upload', protect, uploadMiddleware.single('file'), handleUploadError, uploadMedia);
+
+// --- Memories Routes ---
+router.get('/memories', protect, getMemories);
+router.post('/memories', protect, createMemory);
+router.delete('/memories/:memoryId', protect, deleteMemory);
 
 // --- Call Log Routes ---
 router.post('/calls', protect, createCallLog);
@@ -66,6 +75,8 @@ router.get('/calls', protect, getCallHistory);
 router.post('/stories', protect, createStory);
 router.get('/stories', protect, getActiveStories);
 router.post('/stories/view', protect, viewStory);
+router.post('/stories/react', protect, reactToStory);
+router.delete('/stories/:storyId', protect, deleteStory);
 
 
 

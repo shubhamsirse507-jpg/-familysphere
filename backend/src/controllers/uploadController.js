@@ -1,41 +1,36 @@
-import fs from 'fs';
-import path from 'path';
+/**
+ * uploadController.js
+ * Handles secure multipart/form-data file uploads via multer.
+ * The actual multer middleware is applied at the route level (api.js).
+ * This controller only handles post-upload logic and response.
+ */
 
 export const uploadMedia = async (req, res) => {
   try {
-    const { base64Data, filename } = req.body;
-    if (!base64Data) {
-      return res.status(400).json({ error: 'No data provided' });
+    // req.file is populated by multer after it processes the multipart upload
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided in the request.' });
     }
-    
-    // Clean base64 data (remove headers like "data:image/png;base64,")
-    const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    let dataBuffer;
-    let cleanFilename = filename || 'upload.png';
-    
-    if (matches && matches.length === 3) {
-      const type = matches[1];
-      const extension = type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1];
-      dataBuffer = Buffer.from(matches[2], 'base64');
-      if (!filename) {
-        cleanFilename = `media_${Date.now()}.${extension}`;
-      }
-    } else {
-      dataBuffer = Buffer.from(base64Data, 'base64');
+
+    // SECURITY: userId is always taken from JWT-verified token, never from body
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized.' });
     }
-    
-    const uploadDir = path.resolve('public/uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    const filePath = path.join(uploadDir, cleanFilename);
-    fs.writeFileSync(filePath, dataBuffer);
-    
-    const fileUrl = `/uploads/${cleanFilename}`;
-    res.json({ url: fileUrl });
+
+    // Build the public-accessible URL path for this file
+    // Files are stored at: public/uploads/{userId}/{randomFilename}
+    // Served as static at: /uploads/{userId}/{randomFilename}
+    const fileUrl = `/uploads/${userId}/${req.file.filename}`;
+
+    return res.status(200).json({
+      url: fileUrl,
+      filename: req.file.filename,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+    });
   } catch (error) {
     console.error('Upload media error:', error);
-    res.status(500).json({ error: 'Server error uploading file' });
+    return res.status(500).json({ error: 'Server error during file upload.' });
   }
 };

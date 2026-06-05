@@ -11,7 +11,7 @@ import { Op } from 'sequelize';
 
 import { connectDB, sequelize } from './config/db.js';
 import apiRoutes from './routes/api.js';
-import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, MessageStatus } from './models/index.js';
+import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, MessageStatus, Memory } from './models/index.js';
 import { runSeeding } from './seed.js';
 import { requireAdmin } from './middleware/adminAuth.js';
 import { showLogin, processLogin, logout, showDashboard, downloadCSV } from './controllers/adminController.js';
@@ -62,8 +62,8 @@ io.use(async (socket, next) => {
 });
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Setup API Routes
 app.use('/api', apiRoutes);
@@ -97,7 +97,7 @@ const ensureAIUser = async () => {
         phone: '+0000000000',
         passwordHash: 'ai_virtual_account_hashed_secret',
         role: 'AI',
-        profilePhoto: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+        profilePhoto: 'https://ui-avatars.com/api/?name=AI&background=818cf8&color=fff',
       });
       console.log('Virtual AI Assistant user created.');
     }
