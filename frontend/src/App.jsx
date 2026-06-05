@@ -10,9 +10,9 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '/api';
-const SOCKET_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5000'
-  : 'https://familysphere-uf95.onrender.com';
+const SOCKET_BASE = window.location.hostname.includes('onrender.com')
+  ? 'https://familysphere-uf95.onrender.com'
+  : `${window.location.protocol}//${window.location.hostname}:5000`;
 
 const resolveMediaUrl = (url) => {
   if (!url) return '';
