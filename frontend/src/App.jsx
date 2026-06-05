@@ -17,7 +17,9 @@ const SOCKET_BASE = window.location.hostname.includes('onrender.com')
 const resolveMediaUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  return `${SOCKET_BASE}${url}`;
+  return window.location.hostname.includes('onrender.com')
+    ? `${SOCKET_BASE}${url}`
+    : url;
 };
 
 const renderAvatar = (u, size = 'md', borderStyle = {}) => {
@@ -628,9 +630,8 @@ export default function App() {
       if (newMemorySourceType === 'local' && memoryUploadFile) {
         const formData = new FormData();
         formData.append('file', memoryUploadFile);
-        // Use SOCKET_BASE (direct backend) NOT API_BASE (Vite proxy).
-        // Vite proxy corrupts multipart/form-data boundaries for binary uploads.
-        const uploadRes = await fetch(`${SOCKET_BASE}/api/upload`, {
+        // Use API_BASE (Vite proxy) for upload to ensure reliable DNS/port resolution.
+        const uploadRes = await fetch(`${API_BASE}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData,
@@ -840,9 +841,8 @@ export default function App() {
     formData.append('file', file);
 
     try {
-      // NOTE: Use SOCKET_BASE (direct backend) NOT API_BASE (Vite proxy) for multipart uploads.
-      // The Vite dev proxy corrupts multipart/form-data boundaries — bypass it entirely.
-      const res = await fetch(`${SOCKET_BASE}/api/upload`, {
+      // Use API_BASE (Vite proxy) for upload to ensure reliable DNS/port resolution.
+      const res = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         // Do NOT set Content-Type — browser sets it automatically with the correct boundary
@@ -1223,18 +1223,18 @@ export default function App() {
     setIsUploadingStoryMedia(true);
     try {
       // Use FormData (multer) — NOT base64 JSON (old broken format)
-      // Use SOCKET_BASE directly to bypass Vite proxy multipart corruption
+      // Use API_BASE (Vite proxy) for upload to ensure reliable DNS/port resolution.
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${SOCKET_BASE}/api/upload`, {
+      const res = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
       if (res.ok) {
         const data = await res.json();
-        // Resolve to full URL so the preview image loads correctly
-        setNewStory(prev => ({ ...prev, mediaUrl: `${SOCKET_BASE}${data.url}` }));
+        // Save relative mediaUrl for multi-device compatibility
+        setNewStory(prev => ({ ...prev, mediaUrl: data.url }));
       } else {
         const err = await res.json().catch(() => ({}));
         console.error('Story image upload error:', err.error || 'Upload failed');
