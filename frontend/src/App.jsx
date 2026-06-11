@@ -9,10 +9,36 @@ import {
   Image, Users, Heart, Share2, MessageCircle, Lock, EyeOff, CheckSquare, Bell, Cloud, Award
 } from 'lucide-react';
 
-const API_BASE = '/api';
-const SOCKET_BASE = window.location.hostname.includes('onrender.com')
-  ? 'https://familysphere-uf95.onrender.com'
-  : `${window.location.protocol}//${window.location.hostname}:5000`;
+// ─── Backend URL resolution ───────────────────────────────────────────────
+// When running as a Capacitor Android app, window.location is a file:// or
+// capacitor:// origin, NOT the dev server. We must point directly to the
+// backend machine's LAN IP address instead of relying on the Vite proxy.
+const IS_CAPACITOR =
+  window.location.protocol === 'capacitor:' ||
+  window.location.protocol === 'file:' ||
+  (window.location.hostname === 'localhost' && !window.location.port);
+
+// ⚙️  Set this to your PC's LAN IP when building the Android APK.
+// Run `ipconfig` (Windows) or `ifconfig` (Mac/Linux) to find it.
+const BACKEND_LAN_IP = '192.168.42.211';
+const BACKEND_PORT   = '5000';
+
+const BACKEND_BASE =
+  window.location.hostname.includes('onrender.com')
+    ? 'https://familysphere-uf95.onrender.com'
+    : IS_CAPACITOR
+      ? `http://${BACKEND_LAN_IP}:${BACKEND_PORT}`
+      : `${window.location.protocol}//${window.location.hostname}:${BACKEND_PORT}`;
+
+// API_BASE: use relative path on web (Vite proxy handles it), direct URL on Android
+const API_BASE =
+  window.location.hostname.includes('onrender.com')
+    ? 'https://familysphere-uf95.onrender.com/api'
+    : IS_CAPACITOR
+      ? `${BACKEND_BASE}/api`
+      : '/api';
+
+const SOCKET_BASE = BACKEND_BASE;
 
 const resolveMediaUrl = (url) => {
   if (!url) return '';
