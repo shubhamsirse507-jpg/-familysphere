@@ -23,8 +23,10 @@ const IS_CAPACITOR =
 const BACKEND_LAN_IP = '10.55.22.92';
 const BACKEND_PORT   = '5000';
 
+const IS_PROD_BUILD = import.meta.env.PROD;
+
 const BACKEND_BASE =
-  window.location.hostname.includes('onrender.com')
+  window.location.hostname.includes('onrender.com') || (IS_CAPACITOR && IS_PROD_BUILD)
     ? 'https://familysphere-uf95.onrender.com'
     : IS_CAPACITOR
       ? `http://${BACKEND_LAN_IP}:${BACKEND_PORT}`
@@ -32,7 +34,7 @@ const BACKEND_BASE =
 
 // API_BASE: use relative path on web (Vite proxy handles it), direct URL on Android
 const API_BASE =
-  window.location.hostname.includes('onrender.com')
+  window.location.hostname.includes('onrender.com') || (IS_CAPACITOR && IS_PROD_BUILD)
     ? 'https://familysphere-uf95.onrender.com/api'
     : IS_CAPACITOR
       ? `${BACKEND_BASE}/api`
@@ -43,8 +45,8 @@ const SOCKET_BASE = BACKEND_BASE;
 const resolveMediaUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  return window.location.hostname.includes('onrender.com')
-    ? `${SOCKET_BASE}${url}`
+  return window.location.hostname.includes('onrender.com') || IS_CAPACITOR
+    ? `${BACKEND_BASE}${url}`
     : url;
 };
 
