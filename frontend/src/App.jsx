@@ -20,7 +20,7 @@ const IS_CAPACITOR =
 
 // ⚙️  Set this to your PC's LAN IP when building the Android APK.
 // Run `ipconfig` (Windows) or `ifconfig` (Mac/Linux) to find it.
-const BACKEND_LAN_IP = '192.168.42.211';
+const BACKEND_LAN_IP = '10.55.22.92';
 const BACKEND_PORT   = '5000';
 
 const BACKEND_BASE =
