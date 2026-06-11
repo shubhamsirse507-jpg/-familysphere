@@ -736,20 +736,24 @@ export default function App() {
       if (newMemorySourceType === 'local' && memoryUploadFile) {
         const formData = new FormData();
         formData.append('file', memoryUploadFile);
-        // Use API_BASE (Vite proxy) for upload to ensure reliable DNS/port resolution.
         const uploadRes = await fetch(`${API_BASE}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData,
         });
         if (!uploadRes.ok) {
-          const err = await uploadRes.json();
-          setMemoriesError(err.error || 'File upload failed.');
+          const errData = await uploadRes.json().catch(() => ({}));
+          setMemoriesError(errData.error || `File upload failed (HTTP ${uploadRes.status}). Check your connection.`);
           setMemoryUploading(false);
           return;
         }
         const uploadData = await uploadRes.json();
         finalMediaUrl = uploadData.url;
+        if (!finalMediaUrl) {
+          setMemoriesError('Upload succeeded but server returned no file URL. Please try again.');
+          setMemoryUploading(false);
+          return;
+        }
       }
 
       // Step 2: Save memory metadata to DB
@@ -779,11 +783,12 @@ export default function App() {
         setMemoryUploadPreview('');
         if (memoryFileRef.current) memoryFileRef.current.value = '';
       } else {
-        const err = await memRes.json();
-        setMemoriesError(err.error || 'Failed to save memory.');
+        const err = await memRes.json().catch(() => ({}));
+        setMemoriesError(err.error || `Failed to save memory (HTTP ${memRes.status}).`);
       }
     } catch (err) {
-      setMemoriesError('Network error. Please try again.');
+      console.error('handleMemorySubmit error:', err);
+      setMemoriesError(`Network error: ${err.message || 'Could not reach the server. Please check your connection.'}`);
     } finally {
       setMemoryUploading(false);
     }
@@ -813,38 +818,42 @@ export default function App() {
   // Resolve a memory's mediaUrl to a displayable URL
   // Handles: local server paths, Google Drive share links, and external URLs
   const resolveMemoryMedia = (mediaUrl) => {
-    if (!mediaUrl) return '';
-
-    // Check if it's a Google Drive/Doc folder
-    const folderMatch = mediaUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-    if (folderMatch) {
-      return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#grid`;
-    }
-
-    // Check if it's a Google Drive/Doc file
-    const dMatch = mediaUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    const idParamMatch = mediaUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    const driveId = (dMatch && dMatch[1]) || (idParamMatch && idParamMatch[1]);
-    
-    if (driveId) {
-      if (mediaUrl.includes('/document/')) {
-        return `https://docs.google.com/document/d/${driveId}/preview`;
+    if (!mediaUrl || typeof mediaUrl !== 'string') return '';
+    try {
+      // Check if it's a Google Drive/Doc folder
+      const folderMatch = mediaUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      if (folderMatch) {
+        return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#grid`;
       }
-      if (mediaUrl.includes('/presentation/')) {
-        return `https://docs.google.com/presentation/d/${driveId}/preview`;
-      }
-      if (mediaUrl.includes('/spreadsheets/')) {
-        return `https://docs.google.com/spreadsheets/d/${driveId}/preview`;
-      }
-      return `https://drive.google.com/file/d/${driveId}/preview`;
-    }
 
-    // Already absolute URL
-    if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+      // Check if it's a Google Drive/Doc file
+      const dMatch = mediaUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const idParamMatch = mediaUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const driveId = (dMatch && dMatch[1]) || (idParamMatch && idParamMatch[1]);
+
+      if (driveId) {
+        if (mediaUrl.includes('/document/')) {
+          return `https://docs.google.com/document/d/${driveId}/preview`;
+        }
+        if (mediaUrl.includes('/presentation/')) {
+          return `https://docs.google.com/presentation/d/${driveId}/preview`;
+        }
+        if (mediaUrl.includes('/spreadsheets/')) {
+          return `https://docs.google.com/spreadsheets/d/${driveId}/preview`;
+        }
+        return `https://drive.google.com/file/d/${driveId}/preview`;
+      }
+
+      // Already absolute URL
+      if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+        return mediaUrl;
+      }
+      // Local server path — prepend backend base
+      return resolveMediaUrl(mediaUrl);
+    } catch (err) {
+      console.error('resolveMemoryMedia error:', err, 'url:', mediaUrl);
       return mediaUrl;
     }
-    // Local server path — prepend backend base
-    return resolveMediaUrl(mediaUrl);
   };
 
   // Is this media a video? (checks extension or mimetype hint)
@@ -3640,65 +3649,10 @@ export default function App() {
             </div>
           )}
 
-          {/* G. MEMORIES (Shared Media) TAB */}
-          {activeTab === 'memories' && (
-            <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit' }}>Shared Memories</h3>
-              </div>
-              
-              {/* Share a photo memory */}
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                if (!newMemoryTitle.trim() || !newMemoryUrl.trim()) return;
-                const newMem = {
-                  id: sharedPhotos.length + 1,
-                  title: newMemoryTitle,
-                  url: newMemoryUrl,
-                  uploader: user.name,
-                  date: 'Just now'
-                };
-                setSharedPhotos([newMem, ...sharedPhotos]);
-                setNewMemoryTitle('');
-                setNewMemoryUrl('');
-              }} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '16px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Memory title (e.g. Picnic)..." 
-                  className="input-field" 
-                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '12px' }}
-                  value={newMemoryTitle}
-                  onChange={(e) => setNewMemoryTitle(e.target.value)}
-                  required
-                />
-                <input 
-                  type="text" 
-                  placeholder="Photo URL..." 
-                  className="input-field" 
-                  style={{ padding: '6px 12px', background: 'var(--bg-secondary)', fontSize: '12px' }}
-                  value={newMemoryUrl}
-                  onChange={(e) => setNewMemoryUrl(e.target.value)}
-                  required
-                />
-                <button type="submit" className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px', alignSelf: 'flex-end', borderRadius: '8px' }}>
-                  Share Memory
-                </button>
-              </form>
-
-              {/* Photos Grid */}
-              <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {sharedPhotos.map(photo => (
-                  <div key={photo.id} className="glass-card" style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-glass)' }}>
-                    <img src={photo.url} style={{ width: '100%', height: '80px', objectFit: 'cover' }} alt="Memory" />
-                    <div style={{ padding: '8px' }}>
-                      <div style={{ fontWeight: '700', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{photo.title}</div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '2px' }}>By: {photo.uploader}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* G. MEMORIES (Shared Media) TAB — uses the full renderMemoriesWorkspace so
+               both web and mobile get proper API-backed upload, Google Drive links and
+               local file upload support (old local-only duplicate was causing crashes). */}
+          {activeTab === 'memories' && renderMemoriesWorkspace()}
 
           {/* H. CIRCLES (Community Channels) TAB */}
           {activeTab === 'circles' && (
