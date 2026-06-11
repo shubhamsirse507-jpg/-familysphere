@@ -255,6 +255,18 @@ export const Memory = sequelize.define('Memory', {
     type: DataTypes.STRING, // 'local', 'googledrive', 'url'
     defaultValue: 'local',
   },
+  shareType: {
+    type: DataTypes.STRING, // 'family', 'individual', 'chat'
+    defaultValue: 'family',
+  },
+  targetUserId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  targetChatId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 });
 
 // --- BlockedUser Model ---
@@ -336,6 +348,9 @@ BlockedUser.belongsTo(User, { as: 'blocked', foreignKey: 'blockedId' });
 // Memories
 User.hasMany(Memory, { as: 'memories', foreignKey: 'userId', onDelete: 'CASCADE' });
 Memory.belongsTo(User, { as: 'uploader', foreignKey: 'userId' });
+Memory.belongsTo(User, { as: 'sharedWith', foreignKey: 'targetUserId', onDelete: 'SET NULL' });
+Memory.belongsTo(Chat, { as: 'sharedChat', foreignKey: 'targetChatId', onDelete: 'SET NULL' });
+Chat.hasMany(Memory, { as: 'memories', foreignKey: 'targetChatId', onDelete: 'CASCADE' });
 
 // Sync database function helper
 export const syncDatabase = async (force = false) => {

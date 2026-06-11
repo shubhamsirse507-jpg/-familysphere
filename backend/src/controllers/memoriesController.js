@@ -1,21 +1,52 @@
-/**
- * memoriesController.js
- * Handles create, read, and delete operations for the Memory model.
- * All routes are JWT-protected (req.user is set by the protect middleware).
- */
+import { Memory, User, Chat, ChatMember } from '../models/index.js';
+import { Op } from 'sequelize';
 
-import { Memory, User } from '../models/index.js';
-
-// GET /api/memories — Fetch all family memories (shared by all users)
+// GET /api/memories — Fetch family memories based on sharing permissions
 export const getMemories = async (req, res) => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    // Find all chats where the user is a member
+    const chatMemberships = await ChatMember.findAll({
+      where: { userId },
+      attributes: ['chatId'],
+    });
+    const chatIds = chatMemberships.map(cm => cm.chatId);
+
     const memories = await Memory.findAll({
+      where: {
+        [Op.or]: [
+          { shareType: 'family' },
+          { shareType: null }, // Handle existing/historical database records
+          { userId },
+          { targetUserId: userId },
+          {
+            [Op.and]: [
+              { shareType: 'chat' },
+              { targetChatId: { [Op.in]: chatIds } }
+            ]
+          }
+        ]
+      },
       include: [
         {
           model: User,
           as: 'uploader',
           attributes: ['id', 'name', 'profilePhoto'],
         },
+        {
+          model: User,
+          as: 'sharedWith',
+          attributes: ['id', 'name', 'profilePhoto'],
+        },
+        {
+          model: Chat,
+          as: 'sharedChat',
+          attributes: ['id', 'name', 'isGroup'],
+        }
       ],
       order: [['createdAt', 'DESC']],
     });
@@ -29,7 +60,7 @@ export const getMemories = async (req, res) => {
 // POST /api/memories — Create a new memory
 export const createMemory = async (req, res) => {
   try {
-    const { title, description, mediaUrl, sourceType } = req.body;
+    const { title, description, mediaUrl, sourceType, shareType, targetUserId, targetChatId } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -46,15 +77,22 @@ export const createMemory = async (req, res) => {
     const validSourceTypes = ['local', 'googledrive', 'url'];
     const type = validSourceTypes.includes(sourceType) ? sourceType : 'local';
 
+    // Validate shareType
+    const validShareTypes = ['family', 'individual', 'chat'];
+    const sType = validShareTypes.includes(shareType) ? shareType : 'family';
+
     const memory = await Memory.create({
       userId,
       title: title.trim(),
       description: description?.trim() || '',
       mediaUrl: mediaUrl.trim(),
       sourceType: type,
+      shareType: sType,
+      targetUserId: sType === 'individual' ? targetUserId : null,
+      targetChatId: sType === 'chat' ? targetChatId : null,
     });
 
-    // Fetch full memory with uploader info to return
+    // Fetch full memory with uploader/recipient info to return
     const fullMemory = await Memory.findByPk(memory.id, {
       include: [
         {
@@ -62,6 +100,16 @@ export const createMemory = async (req, res) => {
           as: 'uploader',
           attributes: ['id', 'name', 'profilePhoto'],
         },
+        {
+          model: User,
+          as: 'sharedWith',
+          attributes: ['id', 'name', 'profilePhoto'],
+        },
+        {
+          model: Chat,
+          as: 'sharedChat',
+          attributes: ['id', 'name', 'isGroup'],
+        }
       ],
     });
 

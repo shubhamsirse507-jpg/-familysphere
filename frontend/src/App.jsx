@@ -200,6 +200,9 @@ export default function App() {
   const [memoriesLoading, setMemoriesLoading] = useState(false);
   const [memoriesError, setMemoriesError] = useState('');
   const [memoryUploading, setMemoryUploading] = useState(false);
+  const [newMemoryShareType, setNewMemoryShareType] = useState('family'); // 'family'|'individual'|'chat'
+  const [newMemoryTargetUserId, setNewMemoryTargetUserId] = useState('');
+  const [newMemoryTargetChatId, setNewMemoryTargetChatId] = useState('');
   const memoryFileRef = useRef(null);
 
   const [circlesList, setCirclesList] = useState([
@@ -719,6 +722,14 @@ export default function App() {
       setMemoriesError('Please enter a URL.');
       return;
     }
+    if (newMemoryShareType === 'individual' && !newMemoryTargetUserId) {
+      setMemoriesError('Please select a family member to share with.');
+      return;
+    }
+    if (newMemoryShareType === 'chat' && !newMemoryTargetChatId) {
+      setMemoriesError('Please select a chat group to share with.');
+      return;
+    }
 
     setMemoryUploading(true);
     setMemoriesError('');
@@ -768,6 +779,9 @@ export default function App() {
           description: newMemoryDesc.trim(),
           mediaUrl: finalMediaUrl,
           sourceType: finalSourceType,
+          shareType: newMemoryShareType,
+          targetUserId: newMemoryShareType === 'individual' ? newMemoryTargetUserId : null,
+          targetChatId: newMemoryShareType === 'chat' ? newMemoryTargetChatId : null,
         }),
       });
 
@@ -779,6 +793,9 @@ export default function App() {
         setNewMemoryDesc('');
         setNewMemoryUrl('');
         setNewMemorySourceType('local');
+        setNewMemoryShareType('family');
+        setNewMemoryTargetUserId('');
+        setNewMemoryTargetChatId('');
         setMemoryUploadFile(null);
         setMemoryUploadPreview('');
         if (memoryFileRef.current) memoryFileRef.current.value = '';
@@ -2545,6 +2562,69 @@ export default function App() {
             />
           )}
 
+          {/* Share target selection */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>👥 Visibility / Share target</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[
+                { key: 'family', label: '🌍 Family Group' },
+                { key: 'individual', label: '👥 Individual Member' },
+                { key: 'chat', label: '💬 Chat Group' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => { setNewMemoryShareType(key); setNewMemoryTargetUserId(''); setNewMemoryTargetChatId(''); }}
+                  style={{
+                    padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                    border: newMemoryShareType === key ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)',
+                    background: newMemoryShareType === key ? 'var(--color-primary)' : 'var(--bg-tertiary)',
+                    color: newMemoryShareType === key ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Individual member dropdown */}
+            {newMemoryShareType === 'individual' && (
+              <select
+                className="input-field"
+                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', width: '100%', maxWidth: '300px', cursor: 'pointer' }}
+                value={newMemoryTargetUserId}
+                onChange={(e) => setNewMemoryTargetUserId(e.target.value)}
+                required
+              >
+                <option value="">Select a family member...</option>
+                {usersList.filter(u => u.id !== user?.id).map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.role || 'Member'})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Group chat dropdown */}
+            {newMemoryShareType === 'chat' && (
+              <select
+                className="input-field"
+                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', width: '100%', maxWidth: '300px', cursor: 'pointer' }}
+                value={newMemoryTargetChatId}
+                onChange={(e) => setNewMemoryTargetChatId(e.target.value)}
+                required
+              >
+                <option value="">Select a chat group...</option>
+                {chats.filter(c => c.isGroup).map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || 'Unnamed Group'}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <button
             type="submit"
             className="btn-primary"
@@ -2679,11 +2759,36 @@ export default function App() {
                   </div>
 
                   {/* Info area */}
-                  <div style={{ padding: '16px 18px' }}>
-                    <h4 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>{memory.title}</h4>
+                  <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '2px' }}>{memory.title}</h4>
                     {memory.description && (
-                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', lineHeight: '1.5' }}>{memory.description}</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '2px', lineHeight: '1.5' }}>{memory.description}</p>
                     )}
+
+                    {/* Share target badge */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '4px 0' }}>
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-glass)',
+                        fontWeight: '600',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        {memory.shareType === 'individual' ? (
+                          <>👥 Shared with: {memory.sharedWith?.name || 'Individual'}</>
+                        ) : memory.shareType === 'chat' ? (
+                          <>💬 Shared in: {memory.sharedChat?.name || 'Chat Group'}</>
+                        ) : (
+                          <>🌍 Family Group</>
+                        )}
+                      </span>
+                    </div>
+
                     <p style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.7 }}>
                       {new Date(memory.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
