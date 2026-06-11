@@ -342,7 +342,9 @@ export default function App() {
     });
     socketRef.current = socket;
 
-    socket.emit('auth', user.id);
+    socket.on('connect', () => {
+      socket.emit('auth', user.id);
+    });
 
     // Incoming messages
     socket.on('new_message', (msg) => {
@@ -363,11 +365,50 @@ export default function App() {
           });
         }
       }
-      // Re-trigger chats list fetch to update previews/orders
-      fetchChats();
+      // Update chat list locally — move the updated chat to top with new last message preview
+      setChats(prev => {
+        const idx = prev.findIndex(c => c.id === msg.chatId);
+        if (idx === -1) {
+          // Unknown chat — do a full refresh
+          fetchChats();
+          return prev;
+        }
+        const updated = { ...prev[idx], Messages: [msg] };
+        const rest = prev.filter(c => c.id !== msg.chatId);
+        return [updated, ...rest];
+      });
     });
 
-    // Typing updates
+    // Real-time read receipt updates
+    socket.on('messages_read', ({ chatId, userId: readerId }) => {
+      if (activeChatRef.current && chatId === activeChatRef.current.id) {
+        setMessages(prev => prev.map(m => ({
+          ...m,
+          MessageStatuses: m.MessageStatuses
+            ? m.MessageStatuses.map(s => s.userId === readerId ? { ...s, status: 'read' } : s)
+            : m.MessageStatuses
+        })));
+      }
+    });
+
+    // Real-time delivered receipt updates
+    socket.on('messages_delivered', ({ chatId, userId: deliveredTo }) => {
+      if (activeChatRef.current && chatId === activeChatRef.current.id) {
+        setMessages(prev => prev.map(m => ({
+          ...m,
+          MessageStatuses: m.MessageStatuses
+            ? m.MessageStatuses.map(s =>
+                s.userId === deliveredTo && s.status === 'sent'
+                  ? { ...s, status: 'delivered' }
+                  : s
+              )
+            : m.MessageStatuses
+        })));
+      }
+    });
+
+    // Typing updates — auto-clear stale indicators after 4 seconds
+    const typingTimers = {};
     socket.on('typing', (data) => {
       const { chatId, userId, isTyping } = data;
       setTypingUsers(prev => {
@@ -376,6 +417,18 @@ export default function App() {
         next[chatId][userId] = isTyping;
         return next;
       });
+      // Auto-clear stale typing indicators
+      const timerKey = `${chatId}_${userId}`;
+      if (typingTimers[timerKey]) clearTimeout(typingTimers[timerKey]);
+      if (isTyping) {
+        typingTimers[timerKey] = setTimeout(() => {
+          setTypingUsers(prev => {
+            const next = { ...prev };
+            if (next[chatId]) next[chatId][userId] = false;
+            return next;
+          });
+        }, 4000);
+      }
     });
 
 
@@ -383,6 +436,19 @@ export default function App() {
     // Live active users count
     socket.on('active_users_update', (data) => {
       setActiveUsers(data);
+    });
+
+    // Real-time online/offline status dot updates in chat thread list
+    socket.on('user_status_changed', ({ userId, isOnline, lastSeen }) => {
+      // Update isOnline flag on all chats that include this user
+      setChats(prev => prev.map(chat => ({
+        ...chat,
+        Users: chat.Users
+          ? chat.Users.map(u => u.id === userId ? { ...u, isOnline, lastSeen } : u)
+          : chat.Users
+      })));
+      // Also keep the global users list in sync
+      setUsersList(prev => prev.map(u => u.id === userId ? { ...u, isOnline, lastSeen } : u));
     });
 
     // WebRTC Signaling
@@ -533,6 +599,12 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setChats(data);
+        // Re-sync activeChat if it's open, so it gets fresh user/pin data
+        setActiveChat(prev => {
+          if (!prev) return prev;
+          const fresh = data.find(c => c.id === prev.id);
+          return fresh || prev;
+        });
       }
     } catch (err) {
       console.error(err);
@@ -2477,12 +2549,52 @@ export default function App() {
                   {/* Media area */}
                   <div style={{ position: 'relative', height: '220px', width: '100%', background: 'var(--bg-tertiary)' }}>
                     {isDrive ? (
-                      <iframe
-                        src={mediaUrl}
-                        style={{ width: '100%', height: '100%', border: 'none' }}
-                        allow="autoplay"
-                        title={memory.title}
-                      />
+                      /* Google Drive blocks iframe embedding outside google.com domains.
+                         Show a branded clickable card that opens the file in Drive instead. */
+                      <a
+                        href={memory.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', textDecoration: 'none', background: 'linear-gradient(145deg, #1a1f35 0%, #0f1628 100%)', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
+                      >
+                        {/* Subtle Drive logo background watermark */}
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.04 }}>
+                          <svg width="160" height="160" viewBox="0 0 87.3 78" fill="white">
+                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 53H0c0 1.55.4 3.1 1.2 4.5z"/>
+                            <path d="M43.65 25L29.9 0c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5c-.8 1.4-1.2 2.95-1.2 4.5h27.5z"/>
+                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z"/>
+                            <path d="M43.65 25L57.4 0H29.9z"/>
+                            <path d="M59.8 53L43.65 25 27.5 53z"/>
+                            <path d="M73.55 76.8L59.8 53H27.5l13.75 23.8c1.35.8 2.85 1.2 4.4 1.2s3.05-.4 4.4-1.2z"/>
+                          </svg>
+                        </div>
+
+                        {/* Drive icon */}
+                        <div style={{ marginBottom: '14px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                          <svg width="28" height="28" viewBox="0 0 87.3 78" fill="none">
+                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 53H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                            <path d="M43.65 25L29.9 0c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00AC47"/>
+                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#EA4335"/>
+                            <path d="M43.65 25L57.4 0H29.9z" fill="#00832D"/>
+                            <path d="M59.8 53L43.65 25 27.5 53z" fill="#2684FC"/>
+                            <path d="M73.55 76.8L59.8 53H27.5l13.75 23.8c1.35.8 2.85 1.2 4.4 1.2s3.05-.4 4.4-1.2z" fill="#FFBA00"/>
+                          </svg>
+                        </div>
+
+                        {/* Labels */}
+                        <div style={{ color: '#fff', fontWeight: '700', fontSize: '13px', marginBottom: '4px', textAlign: 'center', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {memory.title}
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '14px' }}>
+                          Google Drive file
+                        </div>
+
+                        {/* Open button */}
+                        <div style={{ background: 'linear-gradient(135deg, #4285F4 0%, #34A853 100%)', color: '#fff', padding: '7px 18px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.3px', boxShadow: '0 4px 12px rgba(66,133,244,0.4)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                          Open in Google Drive
+                        </div>
+                      </a>
                     ) : isVideo ? (
                       <video
                         src={mediaUrl}
@@ -4006,7 +4118,7 @@ export default function App() {
                         type="file" 
                         ref={fileInputRef} 
                         style={{ display: 'none' }} 
-                        accept="image/*" 
+                        accept="image/*,video/*" 
                         onChange={handleFileUpload} 
                       />
                       <input 
