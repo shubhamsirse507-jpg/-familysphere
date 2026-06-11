@@ -149,6 +149,7 @@ export default function App() {
   const [showAddChatModal, setShowAddChatModal] = useState(false);
   const [newChatConfig, setNewChatConfig] = useState({ isGroup: false, name: '', members: [] });
   const [smartReplies, setSmartReplies] = useState([]);
+  const [incomingNotification, setIncomingNotification] = useState(null);
 
   // --- Poll Builder State ---
   const [showPollBuilder, setShowPollBuilder] = useState(false);
@@ -283,6 +284,33 @@ export default function App() {
     }
   }, [user]);
 
+  // Auto-dismiss in-app notification after 5 seconds
+  useEffect(() => {
+    if (incomingNotification) {
+      const timer = setTimeout(() => {
+        setIncomingNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [incomingNotification]);
+
+  const handleNotificationClick = async (notif) => {
+    setActiveTab('chats');
+    const existingChat = chats.find(c => c.id === notif.chatId);
+    if (existingChat) {
+      setActiveChat(existingChat);
+    } else {
+      const updatedChats = await fetchChats();
+      if (updatedChats) {
+        const found = updatedChats.find(c => c.id === notif.chatId);
+        if (found) {
+          setActiveChat(found);
+        }
+      }
+    }
+    setIncomingNotification(null);
+  };
+
   // Fetch Message history for active Chat
   useEffect(() => {
     if (activeChat) {
@@ -399,6 +427,18 @@ export default function App() {
           new Notification(`New message from ${msg.sender?.name || 'FamilyMember'}`, {
             body: msg.content,
             icon: msg.sender?.profilePhoto || '/logo.png'
+          });
+        }
+        
+        // Custom in-app notification popup
+        if (msg.senderId !== user.id) {
+          setIncomingNotification({
+            id: msg.id,
+            chatId: msg.chatId,
+            senderName: msg.sender?.name || 'Family Member',
+            senderAvatar: msg.sender?.profilePhoto || msg.sender?.avatar || '',
+            content: msg.content,
+            type: msg.type
           });
         }
       }
@@ -642,6 +682,7 @@ export default function App() {
           const fresh = data.find(c => c.id === prev.id);
           return fresh || prev;
         });
+        return data;
       }
     } catch (err) {
       console.error(err);
@@ -4795,6 +4836,39 @@ export default function App() {
         </div>
       )}
 
+      {/* WhatsApp / Instagram Style In-App Notification Toast */}
+      {incomingNotification && (
+        <div 
+          className="in-app-notification-toast"
+          onClick={() => handleNotificationClick(incomingNotification)}
+        >
+          <div className="toast-avatar-container">
+            {renderAvatar({ name: incomingNotification.senderName, profilePhoto: incomingNotification.senderAvatar }, 'sm')}
+          </div>
+          <div className="toast-content">
+            <div className="toast-header">
+              <span className="toast-title">{incomingNotification.senderName}</span>
+              <span className="toast-time">now</span>
+            </div>
+            <p className="toast-message">
+              {incomingNotification.type === 'image' && '📷 Photo'}
+              {incomingNotification.type === 'video' && '🎥 Video'}
+              {incomingNotification.type === 'poll' && '📊 Poll: '}
+              {incomingNotification.content || ''}
+            </p>
+          </div>
+          <button 
+            className="toast-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIncomingNotification(null);
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Styled inline helpers to support high fidelity transitions */}
       <style>{`
         /* --- Extra Styling overrides --- */
@@ -5047,6 +5121,127 @@ export default function App() {
         }
         .btn-call-util.active {
           background: rgba(255,255,255,0.2);
+        }
+        
+        /* WhatsApp / Instagram style in-app notification toast */
+        .in-app-notification-toast {
+          position: fixed;
+          top: 24px;
+          right: 24px;
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 340px;
+          padding: 14px 16px;
+          background: rgba(255, 255, 255, 0.85);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          border-radius: var(--radius-lg);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03);
+          cursor: pointer;
+          animation: slideInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transition: all 0.3s ease;
+        }
+        
+        [data-theme="dark"] .in-app-notification-toast {
+          background: rgba(20, 26, 38, 0.85);
+          border-color: rgba(255, 255, 255, 0.08);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .in-app-notification-toast:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+          background: rgba(255, 255, 255, 0.95);
+        }
+        
+        [data-theme="dark"] .in-app-notification-toast:hover {
+          background: rgba(25, 32, 47, 0.95);
+        }
+        
+        .toast-avatar-container {
+          flex-shrink: 0;
+        }
+        
+        .toast-content {
+          flex: 1;
+          min-width: 0;
+        }
+        
+        .toast-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 2px;
+        }
+        
+        .toast-title {
+          font-weight: 700;
+          font-size: 14px;
+          color: var(--text-primary);
+          font-family: var(--font-display);
+        }
+        
+        .toast-time {
+          font-size: 11px;
+          color: var(--text-tertiary);
+        }
+        
+        .toast-message {
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.3;
+        }
+        
+        .toast-close-btn {
+          flex-shrink: 0;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent;
+          border: none;
+          color: var(--text-tertiary);
+          cursor: pointer;
+          transition: background var(--transition-fast), color var(--transition-fast);
+        }
+        
+        .toast-close-btn:hover {
+          background: rgba(0, 0, 0, 0.05);
+          color: var(--text-primary);
+        }
+        
+        [data-theme="dark"] .toast-close-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+        }
+        
+        @keyframes slideInDown {
+          from {
+            transform: translateY(-100px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        
+        /* Mobile styling adjustment */
+        @media (max-width: 480px) {
+          .in-app-notification-toast {
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            width: auto;
+          }
         }
       `}</style>
 
