@@ -574,25 +574,7 @@ const startServer = async () => {
       await runSeeding(false);
     }
 
-    // Manual schema migration for Memories table columns (run after tables are created/synced)
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN shareType VARCHAR(255) DEFAULT 'family';");
-      console.log('✅ SQLite Migration: Column shareType added to Memories table.');
-    } catch (err) {
-      // Ignore if column already exists
-    }
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN targetUserId CHAR(36);");
-      console.log('✅ SQLite Migration: Column targetUserId added to Memories table.');
-    } catch (err) {
-      // Ignore if column already exists
-    }
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN targetChatId CHAR(36);");
-      console.log('✅ SQLite Migration: Column targetChatId added to Memories table.');
-    } catch (err) {
-      // Ignore if column already exists
-    }
+
 
     // Clear old calls history to ensure no references to removed users (Mom, Dad, Son) remain
     try {

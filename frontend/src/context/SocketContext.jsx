@@ -33,6 +33,16 @@ export function SocketProvider({ children }) {
       socketInstance.emit('auth', user.id);
     });
 
+    socketInstance.on('family:updated', () => {
+      console.log('[Socket] Family updated, reconnecting socket to fetch new JWT cookies...');
+      socketInstance.disconnect();
+      setTimeout(() => {
+        if (socketRef.current === socketInstance) {
+          socketInstance.connect();
+        }
+      }, 200);
+    });
+
     socketInstance.on('active_users_update', (data) => {
       setActiveUsers(data);
     });

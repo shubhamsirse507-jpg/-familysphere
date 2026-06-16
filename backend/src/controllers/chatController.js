@@ -135,6 +135,7 @@ export const createChat = async (req, res) => {
         name,
         isGroup: true,
         avatar: avatar || 'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?w=150',
+        familyId: req.user.familyId || null,
       });
       
       // Join group creator
@@ -181,7 +182,10 @@ export const createChat = async (req, res) => {
       }
       
       // Create new 1-on-1 Chat
-      const newChat = await Chat.create({ isGroup: false });
+      const newChat = await Chat.create({
+        isGroup: false,
+        familyId: req.user.familyId || null,
+      });
       await ChatMember.create({ chatId: newChat.id, userId });
       await ChatMember.create({ chatId: newChat.id, userId: targetUserId });
       

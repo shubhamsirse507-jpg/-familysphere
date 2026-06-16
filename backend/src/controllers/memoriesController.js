@@ -1,5 +1,6 @@
 import { Memory, User, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
+import { familyWhere } from '../utils/family.js';
 
 // GET /api/memories — Fetch family memories based on sharing permissions
 export const getMemories = async (req, res) => {
@@ -18,15 +19,20 @@ export const getMemories = async (req, res) => {
 
     const memories = await Memory.findAll({
       where: {
-        [Op.or]: [
-          { shareType: 'family' },
-          { shareType: null }, // Handle existing/historical database records
-          { userId },
-          { targetUserId: userId },
+        [Op.and]: [
+          familyWhere(req),
           {
-            [Op.and]: [
-              { shareType: 'chat' },
-              { targetChatId: { [Op.in]: chatIds } }
+            [Op.or]: [
+              { shareType: 'family' },
+              { shareType: null }, // Handle existing/historical database records
+              { userId },
+              { targetUserId: userId },
+              {
+                [Op.and]: [
+                  { shareType: 'chat' },
+                  { targetChatId: { [Op.in]: chatIds } }
+                ]
+              }
             ]
           }
         ]
@@ -90,6 +96,7 @@ export const createMemory = async (req, res) => {
       shareType: sType,
       targetUserId: sType === 'individual' ? targetUserId : null,
       targetChatId: sType === 'chat' ? targetChatId : null,
+      familyId: req.user.familyId || null,
     });
 
     // Fetch full memory with uploader/recipient info to return
@@ -126,7 +133,9 @@ export const deleteMemory = async (req, res) => {
     const { memoryId } = req.params;
     const userId = req.user?.id;
 
-    const memory = await Memory.findByPk(memoryId);
+    const memory = await Memory.findOne({
+      where: { id: memoryId, ...familyWhere(req) }
+    });
     if (!memory) {
       return res.status(404).json({ error: 'Memory not found.' });
     }

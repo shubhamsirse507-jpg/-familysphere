@@ -9,6 +9,7 @@ import { User, BlockedUser, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/db.js';
 import speakeasy from 'speakeasy';
+import { familyWhere } from '../utils/family.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,7 +18,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_1234
 
 const generateAccessToken = (user, sessionId) => {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role, sessionId },
+    { id: user.id, email: user.email, name: user.name, role: user.role, sessionId, familyId: user.familyId },
     JWT_SECRET,
     { expiresIn: '15m' }
   );
@@ -25,7 +26,7 @@ const generateAccessToken = (user, sessionId) => {
 
 const generateRefreshToken = (user, sessionId) => {
   return jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role, sessionId },
+    { id: user.id, email: user.email, name: user.name, role: user.role, sessionId, familyId: user.familyId },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -252,6 +253,7 @@ export const signup = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
+      familyId: user.familyId,
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -324,6 +326,7 @@ export const login = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
+      familyId: user.familyId,
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -376,6 +379,7 @@ export const updateProfile = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
+      familyId: user.familyId,
     });
   } catch (error) {
     console.error('Update profile error:', error);
@@ -404,7 +408,8 @@ export const getAllUsers = async (req, res) => {
       where: {
         id: {
           [Op.notIn]: usersWhoBlockedMe
-        }
+        },
+        ...familyWhere(req)
       },
       attributes: ['id', 'name', 'phone', 'email', 'role', 'profilePhoto'],
     });

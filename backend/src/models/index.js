@@ -1,6 +1,24 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/db.js';
 
+// --- Family Model ---
+export const Family = sequelize.define('Family', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  inviteCode: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+});
+
 // --- User Model ---
 export const User = sequelize.define('User', {
   id: {
@@ -51,6 +69,10 @@ export const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  familyId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 });
 
 // --- Chat Model ---
@@ -73,6 +95,10 @@ export const Chat = sequelize.define('Chat', {
     allowNull: true,
   },
   pinnedMessageId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  familyId: {
     type: DataTypes.UUID,
     allowNull: true,
   },
@@ -186,6 +212,10 @@ export const Story = sequelize.define('Story', {
     type: DataTypes.TEXT,
     defaultValue: '{}',
   },
+  familyId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 });
 
 // --- StoryView Model ---
@@ -264,6 +294,10 @@ export const Memory = sequelize.define('Memory', {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  familyId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 });
 
 // --- BlockedUser Model ---
@@ -304,6 +338,10 @@ export const Post = sequelize.define('Post', {
     type: DataTypes.TEXT,
     allowNull: true,
   },
+  familyId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 });
 
 // --- PostLike Model ---
@@ -323,6 +361,10 @@ export const Circle = sequelize.define('Circle', {
   name: { type: DataTypes.STRING, allowNull: false },
   description: { type: DataTypes.TEXT, allowNull: true },
   icon: { type: DataTypes.STRING, defaultValue: '⭕' },
+  familyId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
 });
 
 // --- CircleMember ---
@@ -422,6 +464,25 @@ User.hasMany(Circle, { foreignKey: 'creatorId', onDelete: 'CASCADE' });
 Circle.belongsTo(User, { as: 'creator', foreignKey: 'creatorId' });
 Circle.belongsToMany(User, { through: CircleMember, foreignKey: 'circleId' });
 User.belongsToMany(Circle, { through: CircleMember, foreignKey: 'userId' });
+
+// Family associations
+Family.hasMany(User, { foreignKey: 'familyId' });
+User.belongsTo(Family, { foreignKey: 'familyId' });
+
+Family.hasMany(Chat, { foreignKey: 'familyId' });
+Chat.belongsTo(Family, { foreignKey: 'familyId' });
+
+Family.hasMany(Story, { foreignKey: 'familyId' });
+Story.belongsTo(Family, { foreignKey: 'familyId' });
+
+Family.hasMany(Memory, { foreignKey: 'familyId' });
+Memory.belongsTo(Family, { foreignKey: 'familyId' });
+
+Family.hasMany(Post, { foreignKey: 'familyId' });
+Post.belongsTo(Family, { foreignKey: 'familyId' });
+
+Family.hasMany(Circle, { foreignKey: 'familyId' });
+Circle.belongsTo(Family, { foreignKey: 'familyId' });
 
 // Sync database function helper
 export const syncDatabase = async (force = false) => {

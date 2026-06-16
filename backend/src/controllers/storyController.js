@@ -1,5 +1,6 @@
 import { Op } from 'sequelize';
 import { Story, StoryView, User, BlockedUser } from '../models/index.js';
+import { familyWhere } from '../utils/family.js';
 
 export const createStory = async (req, res) => {
   try {
@@ -15,6 +16,7 @@ export const createStory = async (req, res) => {
       content,
       mediaUrl,
       expiresAt,
+      familyId: req.user.familyId || null,
     });
     
     const populatedStory = await Story.findByPk(story.id, {
@@ -48,7 +50,8 @@ export const getActiveStories = async (req, res) => {
     const whereCondition = {
       expiresAt: {
         [Op.gt]: now
-      }
+      },
+      ...familyWhere(req)
     };
     
     if (blockedUserIds.length > 0) {
@@ -95,7 +98,9 @@ export const viewStory = async (req, res) => {
     const { storyId } = req.body;
     const userId = req.user.id;
     
-    const story = await Story.findByPk(storyId);
+    const story = await Story.findOne({
+      where: { id: storyId, ...familyWhere(req) }
+    });
     if (!story) {
       return res.status(404).json({ error: 'Story not found' });
     }
@@ -127,7 +132,9 @@ export const reactToStory = async (req, res) => {
     const { storyId, emoji } = req.body;
     const userId = req.user.id;
     
-    const story = await Story.findByPk(storyId);
+    const story = await Story.findOne({
+      where: { id: storyId, ...familyWhere(req) }
+    });
     if (!story) {
       return res.status(404).json({ error: 'Story not found' });
     }
@@ -160,7 +167,9 @@ export const deleteStory = async (req, res) => {
     const { storyId } = req.params;
     const userId = req.user.id;
     
-    const story = await Story.findByPk(storyId);
+    const story = await Story.findOne({
+      where: { id: storyId, ...familyWhere(req) }
+    });
     if (!story) {
       return res.status(404).json({ error: 'Story not found' });
     }

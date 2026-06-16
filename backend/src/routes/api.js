@@ -46,6 +46,7 @@ import { setup2FA, verify2FA, disable2FA } from '../controllers/twoFactorControl
 import { getPosts, createPost, deletePost, likePost, addComment } from '../controllers/postController.js';
 import { reactToMessage } from '../controllers/reactionController.js';
 import { getCircles, createCircle, joinCircle, deleteCircle } from '../controllers/circleController.js';
+import { createFamily, joinFamily, getMyFamily } from '../controllers/familyController.js';
 
 const router = express.Router();
 
@@ -56,6 +57,11 @@ router.post('/auth/logout', logout);
 router.get('/auth/profile', protect, getProfile);
 router.put('/auth/profile', protect, updateProfile);
 router.get('/auth/users', protect, getAllUsers);
+
+// --- Family Routes ---
+router.post('/family/create', protect, createFamily);
+router.post('/family/join', protect, joinFamily);
+router.get('/family/me', protect, getMyFamily);
 
 // --- Chat Routes ---
 router.get('/chats', protect, getChats);

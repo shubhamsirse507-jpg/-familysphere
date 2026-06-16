@@ -1,5 +1,6 @@
 import { User, BlockedUser } from '../models/index.js';
 import { Op } from 'sequelize';
+import { familyWhere } from '../utils/family.js';
 
 export const blockUser = async (req, res) => {
   try {
@@ -14,8 +15,10 @@ export const blockUser = async (req, res) => {
       return res.status(400).json({ error: 'You cannot block yourself' });
     }
     
-    // Check if user to block exists
-    const userToBlock = await User.findByPk(blockedId);
+    // Check if user to block exists and is in the same family
+    const userToBlock = await User.findOne({
+      where: { id: blockedId, ...familyWhere(req) }
+    });
     if (!userToBlock) {
       return res.status(404).json({ error: 'User to block not found' });
     }

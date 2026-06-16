@@ -3,7 +3,7 @@ import path from 'path';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { connectDB, sequelize } from './config/db.js';
-import { User, Chat, ChatMember, Message, Story, PollOption } from './models/index.js';
+import { Family, User, Chat, ChatMember, Message, Story, PollOption } from './models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +62,45 @@ export const runSeeding = async (force = true) => {
     }
     console.log('Database synced.');
 
+    // Run migrations inside seed.js to make sure columns exist before querying User or seeding
+    try {
+      await sequelize.query("ALTER TABLE Memories ADD COLUMN shareType VARCHAR(255) DEFAULT 'family';");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Memories ADD COLUMN targetUserId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Memories ADD COLUMN targetChatId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Users ADD COLUMN familyId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Chats ADD COLUMN familyId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Stories ADD COLUMN familyId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Memories ADD COLUMN familyId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Posts ADD COLUMN familyId CHAR(36);");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Circles ADD COLUMN familyId CHAR(36);");
+    } catch (err) {}
+
+    // Ensure seed family exists
+    let seedFamily = await Family.findOne({ where: { inviteCode: 'FAMILY' } });
+    if (!seedFamily) {
+      seedFamily = await Family.create({
+        name: 'The Singh Family',
+        inviteCode: 'FAMILY'
+      });
+      console.log('Created seed Family: The Singh Family');
+    }
+
     // Look for CSV in multiple locations
     const csvPath1 = path.resolve(__dirname, '../../family_members.csv');
     const csvPath2 = path.resolve(__dirname, '../family_members.csv');
@@ -94,6 +133,7 @@ export const runSeeding = async (force = true) => {
         user.phone = item.Phone || user.phone;
         user.role = item.Role || user.role;
         user.profilePhoto = null; // No default mock profile photos
+        user.familyId = seedFamily.id;
         await user.save();
         console.log(`Updated existing user from CSV: ${user.name} (${user.role})`);
       } else {
@@ -106,6 +146,7 @@ export const runSeeding = async (force = true) => {
           passwordHash,
           role: item.Role || 'Parent',
           profilePhoto: null, // No default mock profile photos
+          familyId: seedFamily.id,
         });
         console.log(`Created new user from CSV: ${user.name} (${user.role})`);
       }
@@ -114,14 +155,18 @@ export const runSeeding = async (force = true) => {
 
     // Get or create general Family Group Chat
     let familyGroup = await Chat.findOne({ where: { name: 'The Family Sphere 🏡', isGroup: true } });
-    if (!familyGroup) {
-      familyGroup = await Chat.create({
-        name: 'The Family Sphere 🏡',
-        isGroup: true,
-        avatar: null, // No default group avatar
-      });
-      console.log('Created Family Group Chat.');
-    }
+      if (!familyGroup) {
+        familyGroup = await Chat.create({
+          name: 'The Family Sphere 🏡',
+          isGroup: true,
+          avatar: null, // No default group avatar
+          familyId: seedFamily.id,
+        });
+        console.log('Created Family Group Chat.');
+      } else {
+        familyGroup.familyId = seedFamily.id;
+        await familyGroup.save();
+      }
 
     // Add all members to the group chat if not already members
     for (const user of createdUsers) {
@@ -187,6 +232,7 @@ export const runSeeding = async (force = true) => {
         type: 'text',
         content: 'Loving the sunny weather today! ☀️🌸',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        familyId: seedFamily.id,
       });
     }
     if (user2) {
@@ -195,6 +241,7 @@ export const runSeeding = async (force = true) => {
         type: 'text',
         content: 'Great day with the family! 🏡❤️',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        familyId: seedFamily.id,
       });
     }
     console.log('Seeded active family status stories.');

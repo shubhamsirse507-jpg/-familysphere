@@ -1,10 +1,12 @@
 import { Post, User, PostLike, PostComment } from '../models/index.js';
+import { familyWhere } from '../utils/family.js';
 
 export const getPosts = async (req, res) => {
   try {
     const posts = await Post.findAll({
       limit: 50,
       order: [['createdAt', 'DESC']],
+      where: familyWhere(req),
       include: [
         { model: User, as: 'author', attributes: ['id', 'name', 'profilePhoto', 'role'] },
         { model: PostLike, attributes: ['id', 'userId'] },
@@ -31,7 +33,8 @@ export const createPost = async (req, res) => {
     const post = await Post.create({
       content,
       mediaUrl: mediaUrl || null,
-      userId: req.user.id
+      userId: req.user.id,
+      familyId: req.user.familyId || null
     });
 
     const fullPost = await Post.findByPk(post.id, {
@@ -61,7 +64,9 @@ export const createPost = async (req, res) => {
 export const deletePost = async (req, res) => {
   try {
     const { id } = req.params;
-    const post = await Post.findByPk(id);
+    const post = await Post.findOne({
+      where: { id, ...familyWhere(req) }
+    });
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -90,7 +95,9 @@ export const likePost = async (req, res) => {
     const { id } = req.params; // post id
     const userId = req.user.id;
 
-    const post = await Post.findByPk(id);
+    const post = await Post.findOne({
+      where: { id, ...familyWhere(req) }
+    });
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -134,7 +141,9 @@ export const addComment = async (req, res) => {
       return res.status(400).json({ error: 'Comment content is required' });
     }
 
-    const post = await Post.findByPk(id);
+    const post = await Post.findOne({
+      where: { id, ...familyWhere(req) }
+    });
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }

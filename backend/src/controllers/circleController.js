@@ -1,8 +1,10 @@
 import { Circle, User, CircleMember } from '../models/index.js';
+import { familyWhere } from '../utils/family.js';
 
 export const getCircles = async (req, res) => {
   try {
     const circles = await Circle.findAll({
+      where: familyWhere(req),
       include: [
         { model: User, attributes: ['id', 'name', 'profilePhoto', 'role'] },
         { model: User, as: 'creator', attributes: ['id', 'name', 'profilePhoto', 'role'] }
@@ -26,7 +28,8 @@ export const createCircle = async (req, res) => {
       name,
       description: description || null,
       icon: icon || '⭕',
-      creatorId: req.user.id
+      creatorId: req.user.id,
+      familyId: req.user.familyId || null
     });
 
     // Auto-join creator as admin member
@@ -61,7 +64,9 @@ export const joinCircle = async (req, res) => {
     const { id } = req.params; // circleId
     const userId = req.user.id;
 
-    const circle = await Circle.findByPk(id);
+    const circle = await Circle.findOne({
+      where: { id, ...familyWhere(req) }
+    });
     if (!circle) {
       return res.status(404).json({ error: 'Circle not found' });
     }
@@ -103,7 +108,9 @@ export const joinCircle = async (req, res) => {
 export const deleteCircle = async (req, res) => {
   try {
     const { id } = req.params;
-    const circle = await Circle.findByPk(id);
+    const circle = await Circle.findOne({
+      where: { id, ...familyWhere(req) }
+    });
     if (!circle) {
       return res.status(404).json({ error: 'Circle not found' });
     }
