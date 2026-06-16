@@ -3,9 +3,12 @@ import { protect } from '../middleware/auth.js';
 import {
   signup,
   login,
+  logout,
   getProfile,
   updateProfile,
   getAllUsers,
+  validateSignup,
+  validateLogin,
 } from '../controllers/authController.js';
 import {
   getChats,
@@ -14,6 +17,9 @@ import {
   pinMessage,
   votePoll,
   deleteChat,
+  searchMessages,
+  editMessage,
+  deleteMessage,
 } from '../controllers/chatController.js';
 import { blockUser, unblockUser, getBlockedUsers } from '../controllers/userController.js';
 import { uploadMedia } from '../controllers/uploadController.js';
@@ -36,11 +42,17 @@ import {
   askAssistant,
 } from '../controllers/aiController.js';
 
+import { setup2FA, verify2FA, disable2FA } from '../controllers/twoFactorController.js';
+import { getPosts, createPost, deletePost, likePost, addComment } from '../controllers/postController.js';
+import { reactToMessage } from '../controllers/reactionController.js';
+import { getCircles, createCircle, joinCircle, deleteCircle } from '../controllers/circleController.js';
+
 const router = express.Router();
 
 // --- Auth Routes ---
-router.post('/auth/signup', signup);
-router.post('/auth/login', login);
+router.post('/auth/signup', validateSignup, signup);
+router.post('/auth/login', validateLogin, login);
+router.post('/auth/logout', logout);
 router.get('/auth/profile', protect, getProfile);
 router.put('/auth/profile', protect, updateProfile);
 router.get('/auth/users', protect, getAllUsers);
@@ -52,6 +64,9 @@ router.post('/chats', protect, createChat);
 router.post('/chats/pin', protect, pinMessage);
 router.post('/chats/vote', protect, votePoll);
 router.delete('/chats/:chatId', protect, deleteChat);
+router.get('/chats/:chatId/search', protect, searchMessages);
+router.put('/chats/:chatId/messages/:messageId', protect, editMessage);
+router.delete('/chats/:chatId/messages/:messageId', protect, deleteMessage);
 
 // --- User Management / Blocks ---
 router.post('/users/block', protect, blockUser);
@@ -77,6 +92,27 @@ router.get('/stories', protect, getActiveStories);
 router.post('/stories/view', protect, viewStory);
 router.post('/stories/react', protect, reactToStory);
 router.delete('/stories/:storyId', protect, deleteStory);
+
+// --- 2FA Routes ---
+router.post('/auth/2fa/setup', protect, setup2FA);
+router.post('/auth/2fa/verify', protect, verify2FA);
+router.post('/auth/2fa/disable', protect, disable2FA);
+
+// --- Feed Posts Routes ---
+router.get('/posts', protect, getPosts);
+router.post('/posts', protect, createPost);
+router.delete('/posts/:id', protect, deletePost);
+router.post('/posts/:id/like', protect, likePost);
+router.post('/posts/:id/comment', protect, addComment);
+
+// --- Message Reaction Routes ---
+router.post('/messages/:id/react', protect, reactToMessage);
+
+// --- Circles Routes ---
+router.get('/circles', protect, getCircles);
+router.post('/circles', protect, createCircle);
+router.post('/circles/:id/join', protect, joinCircle);
+router.delete('/circles/:id', protect, deleteCircle);
 
 
 

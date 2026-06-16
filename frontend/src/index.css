@@ -522,3 +522,102 @@ a {
   stroke: var(--color-primary);
   transform: scale(1.1);
 }
+
+/* ==========================================================================
+   Skeleton Shimmer & Navigation Overlay Styles
+   ========================================================================== */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-secondary) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.unread-badge {
+  background-color: var(--color-danger);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 9999px;
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--bg-secondary);
+  line-height: 1;
+}
+
+/* Custom visual styles for context reactions */
+.reaction-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.reaction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-glass);
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.reaction-badge:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .reaction-badge {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .reaction-badge:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.reaction-picker-menu {
+  display: flex;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  padding: 6px 12px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  position: absolute;
+  z-index: 1000;
+  animation: fadeIn var(--transition-fast) forwards;
+}
+
+.reaction-picker-emoji {
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.reaction-picker-emoji:hover {
+  transform: scale(1.3);
+}
+

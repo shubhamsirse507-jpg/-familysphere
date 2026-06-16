@@ -179,12 +179,11 @@ export const showDashboard = async (req, res) => {
       order: [['createdAt', 'ASC']]
     });
 
-    const headers = ['Name', 'Phone', 'Email', 'Password', 'Role', 'ProfilePhoto'];
+    const headers = ['Name', 'Phone', 'Email', 'Role', 'ProfilePhoto'];
     const rows = users.map(user => ({
       Name: user.name,
       Phone: user.phone,
       Email: user.email,
-      Password: user.plainPassword || '••••••••',
       Role: user.role,
       ProfilePhoto: user.profilePhoto || ''
     }));
@@ -193,9 +192,6 @@ export const showDashboard = async (req, res) => {
       <tr>
         <td>${i + 1}</td>
         ${headers.map(h => {
-          if (h === 'Password') {
-            return `<td><span class="password-cell" onclick="this.textContent = this.textContent === '••••••••' ? '${(row[h]||'').replace(/'/g,"\\'")}' : '••••••••'" style="cursor:pointer;" title="Click to reveal">••••••••</span></td>`;
-          }
           if (h === 'ProfilePhoto' && row[h] && row[h].startsWith('http')) {
             return `<td><img src="${row[h]}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #a78bfa;"/></td>`;
           }
@@ -425,7 +421,7 @@ export const downloadCSV = async (req, res) => {
       order: [['createdAt', 'ASC']]
     });
 
-    const headers = ['Name', 'Phone', 'Email', 'Password', 'Role', 'ProfilePhoto'];
+    const headers = ['Name', 'Phone', 'Email', 'Role', 'ProfilePhoto'];
     
     // Construct CSV Header
     let csvContent = headers.join(',') + '\n';
@@ -436,7 +432,6 @@ export const downloadCSV = async (req, res) => {
         escapeCsv(u.name),
         escapeCsv(u.phone),
         escapeCsv(u.email),
-        escapeCsv(u.plainPassword || '••••••••'),
         escapeCsv(u.role),
         escapeCsv(u.profilePhoto || '')
       ];

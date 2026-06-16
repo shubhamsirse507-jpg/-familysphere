@@ -5,9 +5,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_1234
 
 export const protect = async (req, res, next) => {
   try {
-    let token;
+    let token = req.cookies ? req.cookies.token : null;
     
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
     

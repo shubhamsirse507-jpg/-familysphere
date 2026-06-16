@@ -2,6 +2,9 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,7 +14,7 @@ import { Op } from 'sequelize';
 
 import { connectDB, sequelize } from './config/db.js';
 import apiRoutes from './routes/api.js';
-import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, MessageStatus, Memory } from './models/index.js';
+import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, MessageStatus, Memory, MessageReaction, Post, PostLike, PostComment } from './models/index.js';
 import { runSeeding } from './seed.js';
 import { requireAdmin } from './middleware/adminAuth.js';
 import { showLogin, processLogin, logout, showDashboard, downloadCSV } from './controllers/adminController.js';
@@ -27,16 +30,39 @@ const server = http.createServer(app);
 // Initialize Socket.io with CORS allowed for all origins in development
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: ['http://localhost:3000', 'http://localhost:5173'],
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
+app.set('io', io);
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Server will not start.');
+  process.exit(1);
+}
+
+const parseCookies = (cookieString) => {
+  const cookies = {};
+  if (!cookieString) return cookies;
+  cookieString.split(';').forEach(pair => {
+    const parts = pair.split('=');
+    if (parts.length === 2) {
+      cookies[parts[0].trim()] = parts[1].trim();
+    }
+  });
+  return cookies;
+};
 
 // Socket.io JWT Authentication Middleware
 io.use(async (socket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  let token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token && socket.handshake.headers.cookie) {
+    const cookies = parseCookies(socket.handshake.headers.cookie);
+    token = cookies.token;
+  }
   if (!token) {
     return next();
   }
@@ -61,9 +87,36 @@ io.use(async (socket, next) => {
   }
 });
 
-app.use(cors());
+// Security headers
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cookieParser());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true,
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Rate limiting — auth endpoints: max 10 attempts per 15 min per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/signup', authLimiter);
+
+// General API rate limit — 100 requests per minute per IP
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', generalLimiter);
 
 // Request Logger Middleware for debugging
 app.use((req, res, next) => {
@@ -303,6 +356,11 @@ io.on('connection', (socket) => {
           {
             model: MessageStatus,
             attributes: ['userId', 'status']
+          },
+          {
+            model: MessageReaction,
+            attributes: ['id', 'emoji', 'userId'],
+            include: [{ model: User, attributes: ['id', 'name'] }]
           }
         ]
       });
@@ -394,6 +452,27 @@ io.on('connection', (socket) => {
   socket.on('typing', (data) => {
     const { chatId, userId, isTyping } = data;
     socket.to(chatId).emit('typing', { chatId, userId, isTyping });
+  });
+
+  // Handle new post broadcast trigger
+  socket.on('new_post', async (postId) => {
+    try {
+      const post = await Post.findByPk(postId, {
+        include: [
+          { model: User, as: 'author', attributes: ['id', 'name', 'profilePhoto', 'role'] },
+          { model: PostLike, attributes: ['id', 'userId'] },
+          {
+            model: PostComment,
+            include: [{ model: User, as: 'commenter', attributes: ['id', 'name', 'profilePhoto', 'role'] }]
+          }
+        ]
+      });
+      if (post) {
+        io.emit('feed_post_created', post);
+      }
+    } catch (err) {
+      console.error('Socket new_post error:', err);
+    }
   });
 
 

@@ -26,10 +26,7 @@ export const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  plainPassword: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+
   profilePhoto: {
     type: DataTypes.TEXT, // Base64 or image url
     allowNull: true,
@@ -286,6 +283,54 @@ export const BlockedUser = sequelize.define('BlockedUser', {
   },
 });
 
+// --- MessageReaction Model ---
+export const MessageReaction = sequelize.define('MessageReaction', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  emoji: { type: DataTypes.STRING, allowNull: false },
+});
+
+// --- Post Model (Family Feed) ---
+export const Post = sequelize.define('Post', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  content: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+  },
+  mediaUrl: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+});
+
+// --- PostLike Model ---
+export const PostLike = sequelize.define('PostLike', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+});
+
+// --- PostComment Model ---
+export const PostComment = sequelize.define('PostComment', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  content: { type: DataTypes.TEXT, allowNull: false },
+});
+
+// --- Circle Model ---
+export const Circle = sequelize.define('Circle', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  icon: { type: DataTypes.STRING, defaultValue: '⭕' },
+});
+
+// --- CircleMember ---
+export const CircleMember = sequelize.define('CircleMember', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  role: { type: DataTypes.STRING, defaultValue: 'member' },
+});
+
 // =================== ASSOCIATIONS ===================
 
 // Chat <-> User (Many-to-Many via ChatMember)
@@ -351,6 +396,32 @@ Memory.belongsTo(User, { as: 'uploader', foreignKey: 'userId' });
 Memory.belongsTo(User, { as: 'sharedWith', foreignKey: 'targetUserId', onDelete: 'SET NULL' });
 Memory.belongsTo(Chat, { as: 'sharedChat', foreignKey: 'targetChatId', onDelete: 'SET NULL' });
 Chat.hasMany(Memory, { as: 'memories', foreignKey: 'targetChatId', onDelete: 'CASCADE' });
+
+// MessageReactions
+Message.hasMany(MessageReaction, { foreignKey: 'messageId', onDelete: 'CASCADE' });
+MessageReaction.belongsTo(Message, { foreignKey: 'messageId' });
+User.hasMany(MessageReaction, { foreignKey: 'userId', onDelete: 'CASCADE' });
+MessageReaction.belongsTo(User, { foreignKey: 'userId' });
+
+// Feed Posts
+User.hasMany(Post, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Post.belongsTo(User, { as: 'author', foreignKey: 'userId' });
+
+Post.hasMany(PostLike, { foreignKey: 'postId', onDelete: 'CASCADE' });
+PostLike.belongsTo(Post, { foreignKey: 'postId' });
+PostLike.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(PostLike, { foreignKey: 'userId' });
+
+Post.hasMany(PostComment, { foreignKey: 'postId', onDelete: 'CASCADE' });
+PostComment.belongsTo(Post, { foreignKey: 'postId' });
+PostComment.belongsTo(User, { as: 'commenter', foreignKey: 'userId' });
+User.hasMany(PostComment, { foreignKey: 'userId' });
+
+// Circles
+User.hasMany(Circle, { foreignKey: 'creatorId', onDelete: 'CASCADE' });
+Circle.belongsTo(User, { as: 'creator', foreignKey: 'creatorId' });
+Circle.belongsToMany(User, { through: CircleMember, foreignKey: 'circleId' });
+User.belongsToMany(Circle, { through: CircleMember, foreignKey: 'userId' });
 
 // Sync database function helper
 export const syncDatabase = async (force = false) => {

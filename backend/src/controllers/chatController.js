@@ -1,4 +1,4 @@
-import { Chat, ChatMember, Message, User, PollOption, PollVote, MessageStatus, BlockedUser } from '../models/index.js';
+import { Chat, ChatMember, Message, User, PollOption, PollVote, MessageStatus, BlockedUser, MessageReaction } from '../models/index.js';
 import { Op } from 'sequelize';
 
 export const getChats = async (req, res) => {
@@ -98,6 +98,11 @@ export const getMessages = async (req, res) => {
         {
           model: MessageStatus,
           attributes: ['userId', 'status']
+        },
+        {
+          model: MessageReaction,
+          attributes: ['id', 'emoji', 'userId'],
+          include: [{ model: User, attributes: ['id', 'name'] }]
         }
       ]
     });
@@ -288,3 +293,131 @@ export const deleteChat = async (req, res) => {
     res.status(500).json({ error: 'Server error removing chat' });
   }
 };
+
+export const searchMessages = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { q } = req.query;
+    const userId = req.user.id;
+
+    if (!q) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Check authorization: User must be a member of the chat
+    const isMember = await ChatMember.findOne({ where: { chatId, userId } });
+    if (!isMember) {
+      return res.status(403).json({ error: 'You are not a member of this chat' });
+    }
+
+    // Search messages containing query
+    const messages = await Message.findAll({
+      where: {
+        chatId,
+        content: {
+          [Op.like]: `%${q}%`
+        }
+      },
+      order: [['createdAt', 'ASC']],
+      include: [
+        { model: User, as: 'sender', attributes: ['id', 'name', 'role', 'profilePhoto'] }
+      ]
+    });
+
+    res.json(messages);
+  } catch (error) {
+    console.error('Search messages error:', error);
+    res.status(500).json({ error: 'Server error searching messages' });
+  }
+};
+
+export const editMessage = async (req, res) => {
+  try {
+    const { chatId, messageId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+
+    if (!content) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    const message = await Message.findByPk(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    if (message.senderId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to edit this message' });
+    }
+
+    message.content = content;
+    message.isEdited = true;
+    await message.save();
+
+    const fullMessage = await Message.findByPk(messageId, {
+      include: [
+        { model: User, as: 'sender', attributes: ['id', 'name', 'role', 'profilePhoto'] },
+        { 
+          model: Message, 
+          as: 'replyTo', 
+          attributes: ['id', 'content', 'type'],
+          include: [{ model: User, as: 'sender', attributes: ['name'] }]
+        }
+      ]
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('message_updated', fullMessage);
+    }
+
+    res.json(fullMessage);
+  } catch (error) {
+    console.error('Edit message error:', error);
+    res.status(500).json({ error: 'Server error editing message' });
+  }
+};
+
+export const deleteMessage = async (req, res) => {
+  try {
+    const { chatId, messageId } = req.params;
+    const userId = req.user.id;
+
+    const message = await Message.findByPk(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    if (message.senderId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this message' });
+    }
+
+    message.content = 'This message was deleted';
+    message.isDeleted = true;
+    await message.save();
+
+    const fullMessage = await Message.findByPk(messageId, {
+      include: [
+        { model: User, as: 'sender', attributes: ['id', 'name', 'role', 'profilePhoto'] },
+        { 
+          model: Message, 
+          as: 'replyTo', 
+          attributes: ['id', 'content', 'type'],
+          include: [{ model: User, as: 'sender', attributes: ['name'] }]
+        }
+      ]
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('message_updated', fullMessage);
+    }
+
+    res.json(fullMessage);
+  } catch (error) {
+    console.error('Delete message error:', error);
+    res.status(500).json({ error: 'Server error deleting message' });
+  }
+};
+
+

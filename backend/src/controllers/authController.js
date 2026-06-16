@@ -4,31 +4,100 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { body, validationResult } from 'express-validator';
 import { User, BlockedUser, Chat, ChatMember } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/db.js';
+import speakeasy from 'speakeasy';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
 
-const generateToken = (user, sessionId) => {
+const generateAccessToken = (user, sessionId) => {
   return jwt.sign(
     { id: user.id, email: user.email, name: user.name, role: user.role, sessionId },
     JWT_SECRET,
-    { expiresIn: '30d' }
+    { expiresIn: '15m' }
   );
 };
 
-const appendUserToCSV = (name, phone, email, password, role, profilePhoto) => {
+const generateRefreshToken = (user, sessionId) => {
+  return jwt.sign(
+    { id: user.id, email: user.email, name: user.name, role: user.role, sessionId },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+};
+
+export const sendAuthCookies = (res, user, sessionId) => {
+  const token = generateAccessToken(user, sessionId);
+  const refreshToken = generateRefreshToken(user, sessionId);
+  
+  const cookieOptions = (maxAge) => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge,
+  });
+
+  res.cookie('token', token, cookieOptions(15 * 60 * 1000)); // 15 mins
+  res.cookie('refreshToken', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
+};
+
+// ─── Input Validation Schemas ────────────────────────────────────────────────
+
+/** Middleware array — mount before the signup route handler */
+export const validateSignup = [
+  body('name')
+    .trim()
+    .notEmpty().withMessage('Name is required')
+    .isLength({ min: 2, max: 80 }).withMessage('Name must be 2–80 characters'),
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Must be a valid email address')
+    .normalizeEmail(),
+  body('phone')
+    .trim()
+    .notEmpty().withMessage('Phone number is required')
+    .matches(/^[+]?[\d\s\-().]{7,20}$/).withMessage('Must be a valid phone number'),
+  body('password')
+    .notEmpty().withMessage('Password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one number'),
+  body('role')
+    .optional()
+    .isIn(['Parent', 'Child', 'Admin', 'Guardian']).withMessage('Invalid role'),
+];
+
+/** Middleware array — mount before the login route handler */
+export const validateLogin = [
+  body('email')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isEmail().withMessage('Must be a valid email address')
+    .normalizeEmail(),
+  body('username')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 2, max: 80 }).withMessage('Username must be 2–80 characters'),
+  body('password')
+    .notEmpty().withMessage('Password is required'),
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const appendUserToCSV = (name, phone, email, role, profilePhoto) => {
   try {
     const csvPath = path.resolve(__dirname, '../../../family_members.csv');
     let content = '';
     if (fs.existsSync(csvPath)) {
       content = fs.readFileSync(csvPath, 'utf8');
     } else {
-      content = 'Name,Phone,Email,Password,Role,ProfilePhoto\n';
+      content = 'Name,Phone,Email,Role,ProfilePhoto\n';
       fs.writeFileSync(csvPath, content, 'utf8');
     }
     
@@ -43,7 +112,7 @@ const appendUserToCSV = (name, phone, email, password, role, profilePhoto) => {
       return stringified;
     };
     
-    const newLine = `${escapeCsv(name)},${escapeCsv(phone)},${escapeCsv(email)},${escapeCsv(password)},${escapeCsv(role)},${escapeCsv(profilePhoto || '')}\n`;
+    const newLine = `${escapeCsv(name)},${escapeCsv(phone)},${escapeCsv(email)},${escapeCsv(role)},${escapeCsv(profilePhoto || '')}\n`;
     fs.appendFileSync(csvPath, suffix + newLine, 'utf8');
     console.log(`[Developer Log] Appended user ${name} to family_members.csv`);
   } catch (err) {
@@ -103,7 +172,6 @@ const updateUserInCSV = (email, updatedData) => {
           if (h === 'Name') val = updatedData.name !== undefined ? updatedData.name : (values[headers.indexOf('Name')] || '');
           else if (h === 'Phone') val = updatedData.phone !== undefined ? updatedData.phone : (values[headers.indexOf('Phone')] || '');
           else if (h === 'Email') val = email;
-          else if (h === 'Password') val = values[headers.indexOf('Password')] || '';
           else if (h === 'Role') val = updatedData.role !== undefined ? updatedData.role : (values[headers.indexOf('Role')] || '');
           else if (h === 'ProfilePhoto') val = updatedData.profilePhoto !== undefined ? updatedData.profilePhoto : (values[headers.indexOf('ProfilePhoto')] || '');
           else val = values[headers.indexOf(h)] || '';
@@ -126,11 +194,13 @@ const updateUserInCSV = (email, updatedData) => {
 
 export const signup = async (req, res) => {
   try {
-    const { name, phone, email, password, role, profilePhoto } = req.body;
-    
-    if (!name || !phone || !email || !password) {
-      return res.status(400).json({ error: 'All fields are required' });
+    // Collect express-validator errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json({ errors: errors.array() });
     }
+
+    const { name, phone, email, password, role, profilePhoto } = req.body;
     
     const userExists = await User.findOne({ where: { email } });
     if (userExists) {
@@ -149,13 +219,11 @@ export const signup = async (req, res) => {
       phone,
       email,
       passwordHash,
-      plainPassword: password,
       role: role || 'Parent',
       profilePhoto: profilePhoto || null,
     });
     
-    // Automatically log the new user details in plain text to family_members.csv for developer visibility
-    appendUserToCSV(name, phone, email, password, role || 'Parent', profilePhoto);
+    // Note: plaintext credentials are NOT logged for security reasons.
 
     // Auto-join new user to all family group chats
     try {
@@ -175,6 +243,8 @@ export const signup = async (req, res) => {
     user.activeSessionId = sessionId;
     await user.save();
 
+    sendAuthCookies(res, user, sessionId);
+
     res.status(201).json({
       id: user.id,
       name: user.name,
@@ -182,7 +252,6 @@ export const signup = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
-      token: generateToken(user, sessionId),
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -192,11 +261,17 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
+    // Collect express-validator errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json({ errors: errors.array() });
+    }
+
     const { username, email, password } = req.body;
     const loginIdentifier = username || email;
-    
-    if (!loginIdentifier || !password) {
-      return res.status(400).json({ error: 'Username or Email and password are required' });
+
+    if (!loginIdentifier) {
+      return res.status(400).json({ error: 'Username or Email is required' });
     }
     
     const lowerIdentifier = loginIdentifier.toLowerCase();
@@ -217,11 +292,30 @@ export const login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
+
+    // 2FA Verification
+    if (user.twoFactorSecret) {
+      const { twoFactorCode } = req.body;
+      if (!twoFactorCode) {
+        return res.json({ requires2FA: true, userId: user.id, email: user.email });
+      }
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: 'base32',
+        token: twoFactorCode,
+        window: 1
+      });
+      if (!verified) {
+        return res.status(400).json({ error: 'Invalid 2FA code' });
+      }
+    }
     
     // Generate unique session ID — invalidates any previous session
     const sessionId = crypto.randomUUID();
     user.activeSessionId = sessionId;
     await user.save();
+
+    sendAuthCookies(res, user, sessionId);
 
     res.json({
       id: user.id,
@@ -230,7 +324,6 @@ export const login = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
-      token: generateToken(user, sessionId),
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -274,6 +367,8 @@ export const updateProfile = async (req, res) => {
     // Sync updates to family_members.csv
     updateUserInCSV(user.email, { name, phone, role, profilePhoto });
     
+    sendAuthCookies(res, user, req.user.sessionId);
+
     res.json({
       id: user.id,
       name: user.name,
@@ -281,7 +376,6 @@ export const updateProfile = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhoto: user.profilePhoto,
-      token: generateToken(user, req.user.sessionId),
     });
   } catch (error) {
     console.error('Update profile error:', error);
@@ -328,4 +422,10 @@ export const getAllUsers = async (req, res) => {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Server error' });
   }
+};
+
+export const logout = async (req, res) => {
+  res.clearCookie('token');
+  res.clearCookie('refreshToken');
+  res.json({ message: 'Logged out successfully' });
 };
