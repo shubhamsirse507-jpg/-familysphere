@@ -8,17 +8,15 @@ import { ChatProvider } from './context/ChatContext.jsx';
 import { CallProvider } from './context/CallContext.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <SocketProvider>
-        <ChatProvider>
-          <CallProvider>
-            <App />
-          </CallProvider>
-        </ChatProvider>
-      </SocketProvider>
-    </AuthProvider>
-  </React.StrictMode>
+  <AuthProvider>
+    <SocketProvider>
+      <ChatProvider>
+        <CallProvider>
+          <App />
+        </CallProvider>
+      </ChatProvider>
+    </SocketProvider>
+  </AuthProvider>
 );
 
 // Register Progressive Web App (PWA) Service Worker
