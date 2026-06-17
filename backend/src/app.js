@@ -27,15 +27,29 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io with CORS allowed for all origins in development
+const checkOrigin = (origin, callback) => {
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ];
+  if (!origin) return callback(null, true);
+  const isAllowed = allowedOrigins.includes(origin) || 
+                    origin.endsWith('.vercel.app') || 
+                    origin.endsWith('.onrender.com') ||
+                    origin.includes('vercel.app');
+  if (isAllowed) {
+    callback(null, true);
+  } else {
+    callback(new Error('Not allowed by CORS'));
+  }
+};
+
+// Initialize Socket.io with dynamic CORS
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-    ],
+    origin: checkOrigin,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -96,12 +110,7 @@ io.use(async (socket, next) => {
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cookieParser());
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-  ],
+  origin: checkOrigin,
   credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));

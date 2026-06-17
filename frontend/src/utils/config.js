@@ -22,13 +22,14 @@ export const BACKEND_BASE =
 
 // API_BASE: use relative path on web (Vite proxy handles it), direct URL on Android
 export const API_BASE =
-  window.location.hostname.includes('onrender.com') || 
-  window.location.hostname.includes('vercel.app') || 
-  (IS_CAPACITOR && IS_PROD_BUILD)
-    ? 'https://familysphere-uf95.onrender.com/api'
-    : IS_CAPACITOR
-      ? `${BACKEND_BASE}/api`
-      : '/api';
+  window.location.hostname.includes('vercel.app')
+    ? '/api'
+    : window.location.hostname.includes('onrender.com') || 
+      (IS_CAPACITOR && IS_PROD_BUILD)
+        ? 'https://familysphere-uf95.onrender.com/api'
+        : IS_CAPACITOR
+          ? `${BACKEND_BASE}/api`
+          : '/api';
 
 export const SOCKET_BASE = BACKEND_BASE;
 
