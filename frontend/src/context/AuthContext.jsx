@@ -67,10 +67,16 @@ export function AuthProvider({ children }) {
       }
       
       if (!res.ok) {
-        const errMsg = typeof data?.error === 'string' ? data.error
-                     : typeof data?.message === 'string' ? data.message
-                     : typeof data?.error === 'object' ? JSON.stringify(data.error)
-                     : 'Authentication failed';
+        let errMsg = 'Authentication failed';
+        if (data?.errors && Array.isArray(data.errors)) {
+          errMsg = data.errors.map(err => err.msg).join(', ');
+        } else if (typeof data?.error === 'string') {
+          errMsg = data.error;
+        } else if (typeof data?.message === 'string') {
+          errMsg = data.message;
+        } else if (typeof data?.error === 'object') {
+          errMsg = JSON.stringify(data.error);
+        }
         setAuthError(errMsg);
         return;
       }

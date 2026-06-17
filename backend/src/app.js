@@ -184,17 +184,28 @@ const ensureAIUser = async () => {
   }
 };
 
-// Broadcast live active user count to all connected clients
-const broadcastActiveUsers = async () => {
+// Broadcast live active user count to all connected clients in a family
+const broadcastActiveUsers = async (familyId = null) => {
   try {
-    const activeUsers = await User.findAll({
-      where: { isOnline: true },
-      attributes: ['id', 'name', 'role', 'profilePhoto'],
-    });
-    io.emit('active_users_update', {
-      count: activeUsers.length,
-      users: activeUsers.map(u => u.toJSON()),
-    });
+    if (familyId) {
+      const activeUsers = await User.findAll({
+        where: { isOnline: true, familyId },
+        attributes: ['id', 'name', 'role', 'profilePhoto'],
+      });
+      io.to(`family:${familyId}`).emit('active_users_update', {
+        count: activeUsers.length,
+        users: activeUsers.map(u => u.toJSON()),
+      });
+    } else {
+      const activeUsers = await User.findAll({
+        where: { isOnline: true, familyId: null },
+        attributes: ['id', 'name', 'role', 'profilePhoto'],
+      });
+      io.to('family:none').emit('active_users_update', {
+        count: activeUsers.length,
+        users: activeUsers.map(u => u.toJSON()),
+      });
+    }
   } catch (err) {
     console.error('Error broadcasting active users:', err);
   }
@@ -210,9 +221,25 @@ io.on('connection', (socket) => {
     socket.userId = userId;
     
     try {
+      const user = await User.findByPk(userId);
+      if (user) {
+        socket.familyId = user.familyId;
+        if (user.familyId) {
+          socket.join(`family:${user.familyId}`);
+        } else {
+          socket.join('family:none');
+        }
+      }
+      
       await User.update({ isOnline: true, lastSeen: null }, { where: { id: userId } });
-      io.emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
-      await broadcastActiveUsers();
+      
+      if (user && user.familyId) {
+        io.to(`family:${user.familyId}`).emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
+        await broadcastActiveUsers(user.familyId);
+      } else {
+        io.to('family:none').emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
+        await broadcastActiveUsers(null);
+      }
     } catch (err) {
       console.error('Error updating user online status:', err);
     }
@@ -478,7 +505,11 @@ io.on('connection', (socket) => {
         ]
       });
       if (post) {
-        io.emit('feed_post_created', post);
+        if (post.familyId) {
+          io.to(`family:${post.familyId}`).emit('feed_post_created', post);
+        } else {
+          io.to('family:none').emit('feed_post_created', post);
+        }
       }
     } catch (err) {
       console.error('Socket new_post error:', err);
@@ -541,14 +572,21 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', async () => {
     const userId = socket.userId;
+    const familyId = socket.familyId;
     if (userId) {
       try {
         const activeSockets = await io.in(userId).fetchSockets();
         if (activeSockets.length === 0) {
           const lastSeen = new Date();
           await User.update({ isOnline: false, lastSeen }, { where: { id: userId } });
-          io.emit('user_status_changed', { userId, isOnline: false, lastSeen });
-          await broadcastActiveUsers();
+          
+          if (familyId) {
+            io.to(`family:${familyId}`).emit('user_status_changed', { userId, isOnline: false, lastSeen });
+            await broadcastActiveUsers(familyId);
+          } else {
+            io.to('family:none').emit('user_status_changed', { userId, isOnline: false, lastSeen });
+            await broadcastActiveUsers(null);
+          }
         }
       } catch (err) {
         console.error('Error on disconnect presence update:', err);
