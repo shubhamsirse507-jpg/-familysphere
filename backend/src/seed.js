@@ -128,12 +128,15 @@ export const runSeeding = async (force = true) => {
 
       let user = await User.findOne({ where: { email: item.Email } });
       if (user) {
-        // Update user fields without changing password (since user exists)
+        // Update user fields; also update password hash if Password column is present in CSV
         user.name = item.Name || user.name;
         user.phone = item.Phone || user.phone;
         user.role = item.Role || user.role;
         user.profilePhoto = null; // No default mock profile photos
         user.familyId = seedFamily.id;
+        if (item.Password) {
+          user.passwordHash = await bcrypt.hash(item.Password, 10);
+        }
         await user.save();
         console.log(`Updated existing user from CSV: ${user.name} (${user.role})`);
       } else {
