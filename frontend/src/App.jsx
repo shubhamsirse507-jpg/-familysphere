@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check } from 'lucide-react';
 import { API_BASE } from './utils/config.js';
 import useAuth from './hooks/useAuth.js';
 import useSocket from './hooks/useSocket.js';
@@ -59,6 +59,11 @@ export default function App() {
     handleNotificationClick,
     handleSendMessage,
     fetchUsersList,
+    showAddChatModal, setShowAddChatModal,
+    newChatConfig, setNewChatConfig,
+    usersList,
+    handleStartChat,
+    handleStartGroup,
   } = useChats();
   const { activeCall } = useCalls();
 
@@ -237,6 +242,165 @@ export default function App() {
               </div>
               <button type="submit" className="btn-primary" style={{ justifyContent: 'center', marginTop: '6px' }}>Broadcast Poll to Chat</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Chat / New Group Modal */}
+      {showAddChatModal && (
+        <div className="modal-backdrop-blur">
+          <div className="modal-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', width: '95%', maxWidth: '460px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', color: 'var(--text-primary)' }}>New Conversation</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Start a chat or create a group.</p>
+              </div>
+              <button className="btn-icon" onClick={() => { setShowAddChatModal(false); setNewChatConfig({ isGroup: false, name: '', members: [] }); }}><X size={20} /></button>
+            </div>
+
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              <button
+                type="button"
+                onClick={() => setNewChatConfig({ isGroup: false, name: '', members: [] })}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', border: 'none',
+                  background: !newChatConfig.isGroup ? 'var(--color-primary)' : 'var(--bg-tertiary)',
+                  color: !newChatConfig.isGroup ? '#fff' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <MessageSquarePlus size={15} /> Direct Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewChatConfig({ isGroup: true, name: '', members: [] })}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', border: 'none',
+                  background: newChatConfig.isGroup ? 'var(--color-primary)' : 'var(--bg-tertiary)',
+                  color: newChatConfig.isGroup ? '#fff' : 'var(--text-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Users size={15} /> Group Chat
+              </button>
+            </div>
+
+            {/* Direct Chat — pick one person */}
+            {!newChatConfig.isGroup && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Select a family member to message:</p>
+                {usersList.filter(u => u.id !== user?.id).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '13px' }}>No other family members found.</div>
+                ) : (
+                  usersList.filter(u => u.id !== user?.id).map(u => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => handleStartChat(u.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '12px 14px', borderRadius: '12px', border: '1px solid var(--border-glass)',
+                        background: 'var(--bg-tertiary)', cursor: 'pointer', textAlign: 'left',
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-primary-light)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-tertiary)'}
+                    >
+                      <div style={{
+                        width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                        background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontWeight: '800', fontSize: '15px'
+                      }}>
+                        {u.profilePhoto
+                          ? <img src={u.profilePhoto} alt={u.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                          : u.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>{u.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.role} · {u.email}</div>
+                      </div>
+                      <MessageSquarePlus size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Group Chat — name + multi-select members */}
+            {newChatConfig.isGroup && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Group Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Family Fun 🎉"
+                    className="input-field"
+                    value={newChatConfig.name}
+                    onChange={e => setNewChatConfig({ ...newChatConfig, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>Add Members *</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {usersList.filter(u => u.id !== user?.id).map(u => {
+                      const selected = newChatConfig.members.includes(u.id);
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            const already = newChatConfig.members.includes(u.id);
+                            setNewChatConfig(prev => ({
+                              ...prev,
+                              members: already ? prev.members.filter(id => id !== u.id) : [...prev.members, u.id]
+                            }));
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '12px',
+                            padding: '10px 14px', borderRadius: '12px',
+                            border: selected ? '1.5px solid var(--color-primary)' : '1px solid var(--border-glass)',
+                            background: selected ? 'var(--color-primary-light)' : 'var(--bg-tertiary)',
+                            cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s'
+                          }}
+                        >
+                          <div style={{
+                            width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', fontWeight: '800', fontSize: '13px'
+                          }}>
+                            {u.profilePhoto
+                              ? <img src={u.profilePhoto} alt={u.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                              : u.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>{u.name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.role}</div>
+                          </div>
+                          {selected && <Check size={16} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                  <button type="button" onClick={() => { setShowAddChatModal(false); setNewChatConfig({ isGroup: false, name: '', members: [] }); }} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border-glass)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                  <button
+                    type="button"
+                    onClick={handleStartGroup}
+                    disabled={!newChatConfig.name.trim() || newChatConfig.members.length === 0}
+                    className="btn-primary"
+                    style={{ flex: 2, justifyContent: 'center', padding: '12px', borderRadius: '12px', opacity: (!newChatConfig.name.trim() || newChatConfig.members.length === 0) ? 0.5 : 1 }}
+                  >
+                    <Users size={16} /> Create Group ({newChatConfig.members.length} members)
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
