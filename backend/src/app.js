@@ -116,16 +116,17 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Rate limiting — auth endpoints: max 10 attempts per 15 min per IP
+// Rate limiting — auth endpoints: TEMPORARILY DISABLED for dev testing
+// (re-enable before production by restoring max: 10 and uncommenting the app.use lines)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 10000, // effectively disabled
   message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/signup', authLimiter);
+// app.use('/api/auth/login', authLimiter);   // TEMPORARILY DISABLED
+// app.use('/api/auth/signup', authLimiter);  // TEMPORARILY DISABLED
 
 // General API rate limit — 100 requests per minute per IP
 const generalLimiter = rateLimit({

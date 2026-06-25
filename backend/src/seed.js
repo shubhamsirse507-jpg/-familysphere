@@ -137,21 +137,41 @@ export const runSeeding = async (force = true) => {
         if (item.Password) {
           user.passwordHash = await bcrypt.hash(item.Password, 10);
         }
-        await user.save();
+        try { await user.save(); } catch (saveErr) {
+          // phone may conflict with another row — skip phone update and retry
+          user.phone = user.previous('phone') || user.phone;
+          user.familyId = seedFamily.id;
+          await user.save();
+        }
         console.log(`Updated existing user from CSV: ${user.name} (${user.role})`);
       } else {
-        // Create new user
-        const passwordHash = await bcrypt.hash(item.Password || 'Password123', 10);
-        user = await User.create({
-          name: item.Name,
-          phone: item.Phone,
-          email: item.Email,
-          passwordHash,
-          role: item.Role || 'Parent',
-          profilePhoto: null, // No default mock profile photos
-          familyId: seedFamily.id,
-        });
-        console.log(`Created new user from CSV: ${user.name} (${user.role})`);
+        // Create new user — guard against duplicate phone from a prior signup
+        try {
+          const passwordHash = await bcrypt.hash(item.Password || 'Password123', 10);
+          user = await User.create({
+            name: item.Name,
+            phone: item.Phone,
+            email: item.Email,
+            passwordHash,
+            role: item.Role || 'Parent',
+            profilePhoto: null,
+            familyId: seedFamily.id,
+          });
+          console.log(`Created new user from CSV: ${user.name} (${user.role})`);
+        } catch (createErr) {
+          // Likely duplicate phone — find by phone and assign family
+          const byPhone = await User.findOne({ where: { phone: item.Phone } });
+          if (byPhone) {
+            byPhone.familyId = seedFamily.id;
+            if (item.Password) byPhone.passwordHash = await bcrypt.hash(item.Password, 10);
+            await byPhone.save();
+            user = byPhone;
+            console.log(`Assigned existing user (by phone) to seed family: ${byPhone.name}`);
+          } else {
+            console.warn(`Skipping CSV row ${item.Email}: ${createErr.message}`);
+            continue;
+          }
+        }
       }
       createdUsers.push(user);
     }

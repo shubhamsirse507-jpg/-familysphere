@@ -125,3 +125,87 @@ export const getMyFamily = async (req, res) => {
     res.status(500).json({ error: 'Server error fetching family details' });
   }
 };
+
+// ── NEW: Search any user by email (cross-family) ──────────────────────────────
+export const findUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email || email.trim().length < 3) {
+      return res.status(400).json({ error: 'Please provide a valid email to search.' });
+    }
+
+    const found = await User.findOne({
+      where: { email: email.trim().toLowerCase() },
+      attributes: ['id', 'name', 'email', 'role', 'profilePhoto', 'familyId'],
+    });
+
+    if (!found) {
+      return res.status(404).json({ error: 'No user found with that email.' });
+    }
+
+    const myFamilyId = req.user.familyId;
+    const theirFamilyId = found.familyId;
+
+    let status = 'can_invite';
+    if (found.id === req.user.id) {
+      status = 'self';
+    } else if (theirFamilyId && theirFamilyId === myFamilyId) {
+      status = 'already_in_family';
+    } else if (theirFamilyId && theirFamilyId !== myFamilyId) {
+      status = 'in_different_family';
+    }
+
+    res.json({ user: found.toJSON(), status });
+  } catch (error) {
+    console.error('Find user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// ── NEW: Pull a user (by userId) into the requester's family ──────────────────
+export const inviteMemberToFamily = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required.' });
+    }
+
+    const requester = await User.findByPk(req.user.id);
+    if (!requester || !requester.familyId) {
+      return res.status(400).json({ error: 'You must be in a family before inviting others.' });
+    }
+
+    const target = await User.findByPk(userId);
+    if (!target) {
+      return res.status(404).json({ error: 'Target user not found.' });
+    }
+
+    if (target.familyId === requester.familyId) {
+      return res.status(400).json({ error: 'This user is already in your family.' });
+    }
+
+    target.familyId = requester.familyId;
+    await target.save();
+
+    // Emit socket event so the invited user's frontend refreshes immediately
+    const io = req.app.get('io');
+    if (io) {
+      io.to(target.id).emit('family:updated', { familyId: requester.familyId });
+    }
+
+    res.json({
+      message: `${target.name} has been added to your family!`,
+      user: {
+        id: target.id,
+        name: target.name,
+        email: target.email,
+        role: target.role,
+        profilePhoto: target.profilePhoto,
+        familyId: target.familyId,
+      }
+    });
+  } catch (error) {
+    console.error('Invite member error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};

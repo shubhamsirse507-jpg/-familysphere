@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FamilySphere – Git & GitHub Presentation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Inter:wght@300;400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #8b5cf6;
+      --primary-light: #c084fc;
+      --accent: #06b6d4;
+      --accent-light: #22d3ee;
+      --accent2: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+      --bg: #03001e;
+      --glass: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --terminal-bg: rgba(15, 12, 30, 0.85);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── NEBULA BACKGROUND ── */
+    #nebula {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background: 
+        radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 40%);
+    }
+    #stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+    /* ── SLIDES DECK ── */
+    #deck {
+      position: relative; z-index: 1;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 80px;
+      opacity: 0;
+      transform: scale(0.95) translateY(20px);
+      transition: opacity .8s cubic-bezier(0.16, 1, 0.3, 1), transform .8s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .slide.active {
+      opacity: 1; transform: scale(1) translateY(0);
+      pointer-events: all;
+    }
+    .slide.exit {
+      opacity: 0; transform: scale(1.05) translateY(-20px);
+    }
+
+    /* ── PROGRESS BAR ── */
+    #progress-bar {
+      position: fixed; top: 0; left: 0; height: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--accent), var(--primary-light));
+      z-index: 100; transition: width .4s ease;
+      box-shadow: 0 0 16px var(--primary);
+    }
+
+    /* ── HUD ── */
+    #hud {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 16px;
+      background: rgba(15, 12, 30, 0.85);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(20px);
+      border-radius: 50px; padding: 10px 24px;
+      z-index: 100;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    #hud button {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 18px;
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    #hud button:hover { background: var(--glass); color: var(--text); }
+    #hud button.active-btn { background: var(--primary); color: #fff; box-shadow: 0 0 12px var(--primary); }
+    #slide-counter {
+      font-size: 12px; color: var(--muted);
+      font-family: 'Outfit', sans-serif; font-weight: 600;
+      min-width: 50px; text-align: center;
+    }
+    #dots { display: flex; gap: 6px; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted); cursor: pointer;
+      opacity: 0.5;
+      transition: all .3s;
+    }
+    .dot.active { background: var(--accent-light); opacity: 1; transform: scale(1.4); }
+
+    /* ── VOICE INDICATOR ── */
+    #voice-indicator {
+      position: fixed; top: 20px; right: 20px;
+      background: rgba(15, 12, 30, 0.85);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px; padding: 8px 14px;
+      font-size: 11px; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+      z-index: 100; backdrop-filter: blur(12px);
+    }
+    #voice-indicator .mic { font-size: 14px; }
+    #voice-waves { display: flex; gap: 3px; align-items: center; height: 16px; }
+    .wave-bar {
+      width: 3px; background: var(--primary-light); border-radius: 2px;
+      animation: wave var(--s,.6s) ease-in-out infinite alternate;
+      transform-origin: bottom;
+    }
+    @keyframes wave { from { height: 3px; } to { height: 14px; } }
+
+    /* ── KEYBOARD HINT ── */
+    #kbd-hint {
+      position: fixed; top: 20px; left: 20px;
+      font-size: 10px; color: rgba(255,255,255,.2);
+      z-index: 100; font-family:'Outfit',sans-serif;
+    }
+
+    /* ═══════════════════════════════════
+       SLIDE CONTENT STYLES
+    ═══════════════════════════════════ */
+
+    /* ── SLIDE 1 — TITLE ── */
+    .title-slide { text-align: center; }
+    .git-ring {
+      width: 130px; height: 130px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 60px; margin: 0 auto 28px;
+      box-shadow: 0 0 60px rgba(139, 92, 246, 0.5), 0 0 120px rgba(6, 182, 212, 0.35);
+      animation: pulse-ring 3s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%,100% { box-shadow: 0 0 40px rgba(139,92,246,.4), 0 0 80px rgba(6,182,212,.2); }
+      50% { box-shadow: 0 0 80px rgba(139,92,246,.7), 0 0 160px rgba(6,182,212,.4); }
+    }
+    .title-slide h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(38px, 5.5vw, 68px); font-weight: 900;
+      background: linear-gradient(135deg, #fff 0%, var(--primary-light) 50%, var(--accent-light) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      line-height: 1.1; margin-bottom: 14px;
+    }
+    .title-slide .tagline {
+      font-size: clamp(14px, 1.8vw, 20px); color: var(--muted); font-weight: 300;
+      letter-spacing: .5px; margin-bottom: 40px;
+    }
+    .badge-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .badge {
+      background: var(--glass); border: 1px solid var(--glass-border);
+      border-radius: 30px; padding: 7px 18px;
+      font-size: 11px; font-weight: 600; color: var(--accent-light);
+      backdrop-filter: blur(10px);
+    }
+    .badge.git { color: var(--primary-light); }
+
+    /* ── SECTION STYLES ── */
+    .section-title {
+      font-family: 'Outfit', sans-serif; font-weight: 900;
+      font-size: clamp(28px, 4vw, 48px);
+      background: linear-gradient(135deg, #fff 30%, var(--primary-light));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-align: center; margin-bottom: 8px;
+    }
+    .section-sub {
+      font-size: clamp(12px, 1.3vw, 16px); color: var(--muted);
+      text-align: center; margin-bottom: 30px; max-width: 700px;
+    }
+
+    /* ── GLASS CARD ── */
+    .g-card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px; padding: 24px 28px;
+      backdrop-filter: blur(16px);
+      transition: transform .3s, box-shadow .3s, border-color .3s;
+    }
+    .g-card:hover { 
+      transform: translateY(-4px); 
+      box-shadow: 0 20px 40px rgba(139,92,246,0.15); 
+      border-color: rgba(139, 92, 246, 0.3);
+    }
+
+    /* ── SPLIT LAYOUT ── */
+    .split { display: flex; gap: 36px; align-items: stretch; width: 100%; max-width: 1080px; }
+    .split-left { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+    .split-right { flex: 1.2; display: flex; flex-direction: column; gap: 16px; }
+
+    /* ── REPO DETAILS CARD ── */
+    .repo-detail-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .repo-detail-item:last-child { border-bottom: none; }
+    .repo-label { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .repo-value { font-size: 13px; font-weight: 600; color: var(--text); font-family: 'Fira Code', monospace; }
+
+    /* ── TIMELINE ── */
+    .timeline {
+      display: flex; flex-direction: column; gap: 12px;
+      padding-left: 10px; border-left: 2px solid rgba(139, 92, 246, 0.2);
+      margin-left: 6px;
+    }
+    .timeline-node {
+      position: relative; display: flex; flex-direction: column; gap: 4px;
+      padding-left: 16px;
+    }
+    .timeline-node::before {
+      content: ''; position: absolute; left: -16px; top: 6px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--bg);
+      transition: all 0.3s;
+    }
+    .timeline-node:hover::before {
+      background: var(--primary-light); transform: scale(1.3);
+    }
+    .timeline-meta { display: flex; justify-content: space-between; align-items: center; }
+    .timeline-hash { font-family: 'Fira Code', monospace; font-size: 11px; color: var(--accent-light); font-weight: 600; }
+    .timeline-date { font-size: 10px; color: var(--muted); }
+    .timeline-msg { font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4; }
+    .timeline-author { font-size: 10px; color: var(--muted); }
+
+    /* ── COMMAND GRID ── */
+    .cmd-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; width: 100%; max-width: 1100px; }
+    .cmd-column { display: flex; flex-direction: column; gap: 14px; }
+    .cmd-category-title {
+      font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700;
+      color: var(--primary-light); border-bottom: 2px solid rgba(139, 92, 246, 0.2);
+      padding-bottom: 6px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
+    }
+    .cmd-card {
+      background: var(--glass); border: 1px solid var(--glass-border);
+      border-radius: 12px; padding: 14px 18px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: all 0.3s;
+    }
+    .cmd-card:hover {
+      border-color: rgba(6, 182, 212, 0.3);
+      box-shadow: 0 8px 24px rgba(6, 182, 212, 0.1);
+      transform: translateX(4px);
+    }
+    .cmd-header { display: flex; justify-content: space-between; align-items: center; }
+    .cmd-name { font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 600; color: var(--accent-light); }
+    .cmd-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .cmd-box {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--terminal-bg); border-radius: 6px; padding: 6px 10px;
+      border: 1px solid rgba(255,255,255,0.05); font-family: 'Fira Code', monospace; font-size: 11px;
+    }
+    .cmd-box code { color: #f1f5f9; }
+    .btn-copy {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 11px; display: flex; align-items: center; justify-content: center;
+      padding: 4px; border-radius: 4px; transition: all 0.2s;
+    }
+    .btn-copy:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+    .btn-copy.copied { color: var(--green); }
+
+    /* ── WORKFLOW STEPS ── */
+    .flow-wrap { display: flex; justify-content: space-between; width: 100%; max-width: 1000px; position: relative; margin-top: 15px; }
+    .flow-line {
+      position: absolute; top: 30px; left: 50px; right: 50px; height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--accent), var(--green));
+      z-index: 0;
+    }
+    .flow-step {
+      position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;
+      width: 16%; text-align: center; gap: 10px;
+    }
+    .flow-num {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: var(--terminal-bg); border: 2px solid var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 700;
+      color: var(--muted); transition: all 0.3s;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+    .flow-step:hover .flow-num {
+      border-color: var(--accent); color: var(--accent-light);
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+      transform: scale(1.1);
+    }
+    .flow-step.active-step .flow-num {
+      border-color: var(--primary); color: #fff;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    }
+    .flow-title { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; color: var(--text); }
+    .flow-desc { font-size: 10px; color: var(--muted); line-height: 1.4; }
+
+    /* ── VISUALIZATIONS ── */
+    .git-branch-graph {
+      width: 100%; height: 160px; border-radius: 12px;
+      background: var(--terminal-bg); border: 1px solid var(--glass-border);
+      position: relative; overflow: hidden; margin-top: 15px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .branch-line {
+      position: absolute; height: 3px; border-radius: 2px;
+    }
+    .branch-node {
+      position: absolute; width: 12px; height: 12px; border-radius: 50%;
+      border: 3px solid var(--terminal-bg); cursor: pointer; transition: transform 0.2s;
+    }
+    .branch-node:hover { transform: scale(1.4); }
+    .branch-label {
+      position: absolute; font-family: 'Fira Code', monospace; font-size: 9px;
+      color: var(--muted); padding: 2px 6px; background: rgba(0,0,0,0.3); border-radius: 4px;
+    }
+
+    /* responsive */
+    @media(max-width:992px) {
+      .slide { padding: 40px 30px; }
+      .split { flex-direction: column; }
+      .cmd-grid { grid-template-columns: 1fr; }
+      .flow-wrap { flex-wrap: wrap; justify-content: center; gap: 20px; }
+      .flow-line { display: none; }
+      .flow-step { width: 40%; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="nebula"></div>
+<canvas id="stars"></canvas>
+<div id="progress-bar" style="width:0%"></div>
+<div id="kbd-hint">← → Arrow Keys | Space to advance | V Voice</div>
+
+<!-- Voice indicator -->
+<div id="voice-indicator" style="display:none">
+  <span class="mic">🎙️</span>
+  <div id="voice-waves">
+    <div class="wave-bar" style="--s:.4s"></div>
+    <div class="wave-bar" style="--s:.6s"></div>
+    <div class="wave-bar" style="--s:.5s"></div>
+    <div class="wave-bar" style="--s:.7s"></div>
+    <div class="wave-bar" style="--s:.45s"></div>
+  </div>
+  <span id="voice-label">AI Narrating…</span>
+</div>
+
+<div id="deck">
+
+  <!-- ═══ SLIDE 1 — TITLE ═══ -->
+  <div class="slide title-slide active" data-voice="Welcome to the FamilySphere Git and GitHub Workspace presentation. This deck covers our repository configuration, recent development activity, and a comprehensive guide to Git command workflows.">
+    <div class="git-ring">🐙</div>
+    <h1>Git & GitHub Workspace</h1>
+    <p class="tagline">Version Control and Project Architecture Directory for FamilySphere</p>
+    <div class="badge-row">
+      <div class="badge git">🌿 git-version: v2.x</div>
+      <div class="badge">💻 Repo: shubhamsirse507-jpg/-familysphere</div>
+      <div class="badge git">👥 Branches: main</div>
+      <div class="badge">🛠️ Stack: React & Node.js</div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 2 — REPOSITORY & TIMELINE ═══ -->
+  <div class="slide" data-voice="Our project is hosted on GitHub under the repository shubhamsirse507-jpg slash hyphen-familysphere. Recent commits show active development, including updates to chat modals, seeding scripts, CORS configuration, and multi-tenancy socket events.">
+    <h2 class="section-title">Repository & Development Insights</h2>
+    <p class="section-sub">Project metrics, remote parameters, and recent development commit log</p>
+    
+    <div class="split">
+      <div class="split-left">
+        <div class="g-card" style="flex: 1;">
+          <h3 style="font-family: 'Outfit', sans-serif; font-size: 18px; margin-bottom: 16px; color: var(--primary-light); display: flex; align-items: center; gap: 8px;">📊 Repo Configurations</h3>
+          
+          <div class="repo-detail-item">
+            <span class="repo-label">Remote URL</span>
+            <span class="repo-value" style="font-size: 11px;">github.com/shubhamsirse507-jpg/-familysphere.git</span>
+          </div>
+          <div class="repo-detail-item">
+            <span class="repo-label">Owner</span>
+            <span class="repo-value">shubhamsirse507-jpg</span>
+          </div>
+          <div class="repo-detail-item">
+            <span class="repo-label">Developer Email</span>
+            <span class="repo-value" style="font-size: 11px;">shubhamsirse507@gmail.com</span>
+          </div>
+          <div class="repo-detail-item">
+            <span class="repo-label">Default Branch</span>
+            <span class="repo-value">main</span>
+          </div>
+          <div class="repo-detail-item">
+            <span class="repo-label">Architecture</span>
+            <span class="repo-value">Monorepo (/backend, /frontend)</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="split-right">
+        <div class="g-card" style="flex: 1;">
+          <h3 style="font-family: 'Outfit', sans-serif; font-size: 18px; margin-bottom: 16px; color: var(--accent-light);">⏳ Recent Commits Timeline</h3>
+          <div class="timeline">
+            <div class="timeline-node">
+              <div class="timeline-meta">
+                <span class="timeline-hash">fda2136</span>
+                <span class="timeline-date">Jun 18, 2026</span>
+              </div>
+              <p class="timeline-msg">fix: add missing Add Chat modal - + button opens New Conversation dialog</p>
+              <span class="timeline-author">shubhamsirse507-jpg</span>
+            </div>
+            <div class="timeline-node">
+              <div class="timeline-meta">
+                <span class="timeline-hash">99ee4b0</span>
+                <span class="timeline-date">Jun 18, 2026</span>
+              </div>
+              <p class="timeline-msg">fix: add Password column to CSV, update seed.js to sync passwords</p>
+              <span class="timeline-author">shubhamsirse507-jpg</span>
+            </div>
+            <div class="timeline-node">
+              <div class="timeline-meta">
+                <span class="timeline-hash">f308c13</span>
+                <span class="timeline-date">Jun 17, 2026</span>
+              </div>
+              <p class="timeline-msg">fix: resolve Vercel deployment CORS issues and cookie proxying</p>
+              <span class="timeline-author">shubhamsirse507-jpg</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 3 — GIT COMMANDS PART 1 ═══ -->
+  <div class="slide" data-voice="To manage changes locally, we use commands like git init to start, git clone to copy, git status to check file states, git add to stage, and git commit to save changes to history.">
+    <h2 class="section-title">Git Command Reference: Local Setup & Staging</h2>
+    <p class="section-sub">Fundamental commands to set up repositories and track files locally</p>
+    
+    <div class="cmd-grid">
+      <!-- Column 1: Setup -->
+      <div class="cmd-column">
+        <h3 class="cmd-category-title">⚙️ Setup & Initialization</h3>
+        
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git init</span>
+          </div>
+          <p class="cmd-desc">Initialize a brand new local Git repository in the current directory.</p>
+          <div class="cmd-box">
+            <code>git init</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git clone</span>
+          </div>
+          <p class="cmd-desc">Clone/download an existing remote repository from GitHub locally.</p>
+          <div class="cmd-box">
+            <code>git clone https://github.com/shubhamsirse507-jpg/-familysphere.git</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git config</span>
+          </div>
+          <p class="cmd-desc">Set user parameters such as commit author name and email address.</p>
+          <div class="cmd-box">
+            <code>git config --global user.name "shubhamsirse507-jpg"</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Working Directory -->
+      <div class="cmd-column">
+        <h3 class="cmd-category-title">📂 Tracking & Staging Changes</h3>
+        
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git status</span>
+          </div>
+          <p class="cmd-desc">Show the state of the working directory and files (tracked, untracked, staged).</p>
+          <div class="cmd-box">
+            <code>git status</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git add</span>
+          </div>
+          <p class="cmd-desc">Stage specific files or all modified files to prepare them for commit.</p>
+          <div class="cmd-box">
+            <code>git add .</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git commit</span>
+          </div>
+          <p class="cmd-desc">Create a checkpoint log and save staged files to local repository history.</p>
+          <div class="cmd-box">
+            <code>git commit -m "feat: add real-time features"</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 4 — GIT COMMANDS PART 2 ═══ -->
+  <div class="slide" data-voice="To collaborate and sync, we use git push to share changes, git pull to receive updates, git branch to isolate features, git checkout to switch tasks, and git stash to temporarily save uncommitted work.">
+    <h2 class="section-title">Git Command Reference: Syncing & Branching</h2>
+    <p class="section-sub">Advanced commands for branching, team collaboration, remote updates, and histories</p>
+    
+    <div class="cmd-grid">
+      <!-- Column 1: Remotes -->
+      <div class="cmd-column">
+        <h3 class="cmd-category-title">📡 Syncing with GitHub Remotes</h3>
+        
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git pull</span>
+          </div>
+          <p class="cmd-desc">Fetch and integrate latest changes from the remote GitHub branch.</p>
+          <div class="cmd-box">
+            <code>git pull origin main</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git push</span>
+          </div>
+          <p class="cmd-desc">Upload committed local branch files to the remote repository.</p>
+          <div class="cmd-box">
+            <code>git push origin main</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git remote -v</span>
+          </div>
+          <p class="cmd-desc">Display connection URL mappings for remote repositories.</p>
+          <div class="cmd-box">
+            <code>git remote -v</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Branches -->
+      <div class="cmd-column">
+        <h3 class="cmd-category-title">🌿 Branches, History & Utilities</h3>
+        
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git checkout -b</span>
+          </div>
+          <p class="cmd-desc">Create a new branch and switch the workspace active folder to it.</p>
+          <div class="cmd-box">
+            <code>git checkout -b feature/chat-room</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git stash</span>
+          </div>
+          <p class="cmd-desc">Temporarily shelve / hide modified uncommitted files to clear your branch.</p>
+          <div class="cmd-box">
+            <code>git stash && git stash pop</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+
+        <div class="cmd-card">
+          <div class="cmd-header">
+            <span class="cmd-name">git log --oneline</span>
+          </div>
+          <p class="cmd-desc">Show clean, simplified history of commits in single lines.</p>
+          <div class="cmd-box">
+            <code>git log --oneline -n 5</code>
+            <button class="btn-copy" onclick="copyCmd(this)">📋</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 5 — WORKFLOW & BEST PRACTICES ═══ -->
+  <div class="slide" data-voice="A clean Git workflow is crucial. Always pull the latest main branch, create dedicated feature branches, use conventional commit messages, and review changes before merging.">
+    <h2 class="section-title">Git Workflow Best Practices</h2>
+    <p class="section-sub">Standard development cycle and branch integration flow for the FamilySphere project</p>
+    
+    <div class="flow-wrap">
+      <div class="flow-line"></div>
+      
+      <div class="flow-step active-step">
+        <div class="flow-num">1</div>
+        <div class="flow-title">Pull Latest</div>
+        <div class="flow-desc">Ensure your main branch is fully up-to-date with remote commits.<br/><code>git pull</code></div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-title">Branch out</div>
+        <div class="flow-desc">Isolate your codes in custom branches.<br/><code>git checkout -b</code></div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-title">Write Codes</div>
+        <div class="flow-desc">Make changes, verify locally, structure logic.</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-title">Stage & Save</div>
+        <div class="flow-desc">Add changes and commit them cleanly.<br/><code>git commit</code></div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-title">Push remote</div>
+        <div class="flow-desc">Upload features to GitHub.<br/><code>git push</code></div>
+      </div>
+
+      <div class="flow-step">
+        <div class="flow-num">6</div>
+        <div class="flow-title">Pull Request</div>
+        <div class="flow-desc">Open a Pull Request on GitHub and merge features.</div>
+      </div>
+    </div>
+
+    <!-- Branch graph visualizer representation -->
+    <div class="git-branch-graph" style="width: 100%; max-width: 1000px;">
+      <!-- master branch -->
+      <div class="branch-line" style="left: 50px; width: 900px; top: 50%; background: var(--primary); transform: translateY(-50%);"></div>
+      <div class="branch-node" style="left: 100px; top: 50%; background: var(--primary-light); transform: translate(-50%, -50%);" title="Commit 1 - Setup"></div>
+      <div class="branch-node" style="left: 250px; top: 50%; background: var(--primary-light); transform: translate(-50%, -50%);" title="Commit 2 - Base files"></div>
+      <div class="branch-node" style="left: 850px; top: 50%; background: var(--primary-light); transform: translate(-50%, -50%);" title="Commit 5 - Merge PR"></div>
+      
+      <!-- feature branch -->
+      <div class="branch-line" style="left: 250px; width: 450px; top: 25%; background: var(--accent); height: 2px;"></div>
+      <!-- curved connectors -->
+      <div class="branch-line" style="left: 243px; width: 15px; top: 38%; background: var(--accent); height: 2px; transform: rotate(-45deg);"></div>
+      <div class="branch-line" style="left: 692px; width: 15px; top: 38%; background: var(--accent); height: 2px; transform: rotate(45deg);"></div>
+      
+      <div class="branch-node" style="left: 400px; top: 25%; background: var(--accent-light); transform: translate(-50%, -50%);" title="Commit 3 - Chat feature"></div>
+      <div class="branch-node" style="left: 580px; top: 25%; background: var(--accent-light); transform: translate(-50%, -50%);" title="Commit 4 - Modals fix"></div>
+      
+      <!-- branch tags -->
+      <div class="branch-label" style="left: 50px; top: 80px;">main</div>
+      <div class="branch-label" style="left: 280px; top: 12px; color: var(--accent-light);">feature/add-chat</div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- HUD -->
+<div id="hud">
+  <button id="btn-voice" title="Toggle AI Voice" onclick="toggleVoice()">🎙️</button>
+  <button id="btn-prev" onclick="prevSlide()" title="Previous">‹</button>
+  <div id="dots"></div>
+  <button id="btn-next" onclick="nextSlide()" title="Next">›</button>
+  <span id="slide-counter">1 / 5</span>
+  <button id="btn-auto" title="Auto-play" onclick="toggleAuto()">▶</button>
+  <button title="Fullscreen" onclick="toggleFS()">⛶</button>
+</div>
+
+<script>
+/* ── STARFIELD & NEBULA ── */
+(function(){
+  const c = document.getElementById('stars');
+  const ctx = c.getContext('2d');
+  c.width = window.innerWidth; c.height = window.innerHeight;
+  const stars = Array.from({length:150},()=>({
+    x:Math.random()*c.width, y:Math.random()*c.height,
+    r:Math.random()*1.2+.3, o:Math.random()*.8+.2,
+    s:Math.random()*3+1
+  }));
+  let t=0;
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    stars.forEach(s=>{
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${s.o*(0.4+0.6*Math.sin(t/s.s))})`;
+      ctx.fill();
+    });
+    t+=.03;
+    requestAnimationFrame(draw);
+  }
+  draw();
+  window.addEventListener('resize',()=>{ c.width=window.innerWidth; c.height=window.innerHeight; });
+})();
+
+/* ── SLIDES ── */
+const slides = document.querySelectorAll('.slide');
+let current = 0;
+let autoTimer = null;
+let voiceOn = false;
+let speaking = false;
+
+const progressBar = document.getElementById('progress-bar');
+const counter = document.getElementById('slide-counter');
+const dotsContainer = document.getElementById('dots');
+const btnAuto = document.getElementById('btn-auto');
+const btnVoice = document.getElementById('btn-voice');
+const voiceIndicator = document.getElementById('voice-indicator');
+
+// Build dots
+slides.forEach((_,i)=>{
+  const d = document.createElement('div');
+  d.className = 'dot' + (i===0?' active':'');
+  d.onclick = ()=>goTo(i);
+  dotsContainer.appendChild(d);
+});
+
+function updateUI(){
+  progressBar.style.width = ((current+1)/slides.length*100)+'%';
+  counter.textContent = `${current+1} / ${slides.length}`;
+  document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===current));
+}
+
+function goTo(n, dir='next'){
+  if(n===current) return;
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  const prev = slides[current];
+  prev.classList.remove('active');
+  prev.classList.add('exit');
+  setTimeout(()=>prev.classList.remove('exit'), 800);
+  current = (n + slides.length) % slides.length;
+  slides[current].classList.add('active');
+  updateUI();
+  if(voiceOn) speakSlide();
+  
+  // Highlight steps in Slide 5 dynamically
+  if (current === 4) {
+    animateSteps();
+  }
+}
+
+function nextSlide(){ goTo(current+1,'next'); }
+function prevSlide(){ goTo(current-1,'prev'); }
+
+function toggleAuto(){
+  if(autoTimer){
+    clearInterval(autoTimer);
+    autoTimer=null;
+    btnAuto.textContent='▶';
+    btnAuto.classList.remove('active-btn');
+  } else {
+    autoTimer = setInterval(()=>{
+      if(current === slides.length-1){ 
+        clearInterval(autoTimer); 
+        autoTimer=null; 
+        btnAuto.textContent='▶'; 
+        btnAuto.classList.remove('active-btn'); 
+        return; 
+      }
+      nextSlide();
+    }, 8500);
+    btnAuto.textContent='⏸';
+    btnAuto.classList.add('active-btn');
+    if(voiceOn) speakSlide();
+  }
+}
+
+/* ── VOICE ── */
+function speakSlide(){
+  if(!('speechSynthesis' in window)) return;
+  const text = slides[current].dataset.voice;
+  if(!text) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.95; u.pitch = 1.0; u.volume = 1;
+  const voices = window.speechSynthesis.getVoices();
+  const pref = voices.find(v=>v.name.includes('Google') && v.lang==='en-US')
+    || voices.find(v=>v.lang==='en-US')
+    || voices[0];
+  if(pref) u.voice = pref;
+  u.onstart = ()=>{ voiceIndicator.style.display='flex'; speaking=true; };
+  u.onend = u.onerror = ()=>{ voiceIndicator.style.display='none'; speaking=false; };
+  window.speechSynthesis.speak(u);
+}
+
+function toggleVoice(){
+  voiceOn = !voiceOn;
+  btnVoice.classList.toggle('active-btn', voiceOn);
+  if(voiceOn){ speakSlide(); }
+  else { window.speechSynthesis && window.speechSynthesis.cancel(); voiceIndicator.style.display='none'; }
+}
+
+function toggleFS(){
+  if(!document.fullscreenElement){ document.documentElement.requestFullscreen(); }
+  else { document.exitFullscreen(); }
+}
+
+/* ── COPY COMMANDS ── */
+function copyCmd(btn) {
+  const code = btn.previousElementSibling.textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = '✓';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+/* ── WORKFLOW ANIMATION ── */
+function animateSteps() {
+  const steps = document.querySelectorAll('.flow-step');
+  steps.forEach(s => s.classList.remove('active-step'));
+  
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i > 0) steps[i-1].classList.remove('active-step');
+    if (i < steps.length) {
+      steps[i].classList.add('active-step');
+      i++;
+    } else {
+      clearInterval(interval);
+      // keep last one active or loop back
+      steps[0].classList.add('active-step');
+    }
+  }, 1500);
+}
+
+/* ── KEYBOARD ── */
+document.addEventListener('keydown', e=>{
+  if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); nextSlide(); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); prevSlide(); }
+  else if(e.key==='f'||e.key==='F'){ toggleFS(); }
+  else if(e.key==='v'||e.key==='V'){ toggleVoice(); }
+  else if(e.key==='p'||e.key==='P'){ toggleAuto(); }
+});
+
+/* preload voices */
+if('speechSynthesis' in window){
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = ()=> window.speechSynthesis.getVoices();
+}
+
+updateUI();
+</script>
+</body>
+</html>
