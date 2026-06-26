@@ -271,7 +271,7 @@ export default function App() {
       </div>
 
       {/* ── 2. Detail / Workspace Area ──────────────────────────── */}
-      <div className={`detail-area ${activeChat || (['together', 'settings'].includes(activeTab) && mobileWorkspaceActive) ? 'active' : ''}`}>
+      <div className={`detail-area ${activeChat || (['together', 'settings'].includes(activeTab) && mobileWorkspaceActive) ? 'active' : ''} ${activeChat ? 'chat-active' : ''}`}>
         {/* Mobile Back Header */}
         {mobileWorkspaceActive && ['together', 'settings'].includes(activeTab) && (
           <div className="mobile-workspace-header" style={{
@@ -731,9 +731,12 @@ export default function App() {
           .detail-area { display: flex; }
         }
         @media (max-width: 768px) {
-          .sidebar { display: flex; width: 100%; flex-direction: column; background: var(--bg-secondary); height: 100vh; overflow: hidden; }
+          .app-container { height: 100% !important; border: none !important; border-radius: 0 !important; }
+          .sidebar { display: flex; width: 100%; flex-direction: column; background: var(--bg-secondary); height: calc(100% - 68px) !important; overflow: hidden; }
           .sidebar.hidden { display: none; }
-          .detail-area { width: 100%; }
+          .detail-area { width: 100%; height: calc(100% - 68px) !important; }
+          .detail-area.active { display: flex; }
+          .detail-area.chat-active { height: 100% !important; }
           .mobile-workspace-header { display: flex !important; }
           .bottom-nav { justify-content: space-around; padding: 0 4px; gap: 0; }
           .nav-btn { min-width: auto; flex: 1; padding: 6px 4px; font-size: 9px; }
