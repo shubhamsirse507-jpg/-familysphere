@@ -189,6 +189,9 @@ export const inviteMemberToFamily = async (req, res) => {
     if (!requester || !requester.familyId) {
       return res.status(400).json({ error: 'You must be in a family before inviting others.' });
     }
+    if (!['Parent', 'Admin', 'Guardian'].includes(requester.role)) {
+      return res.status(403).json({ error: 'Only a Parent, Admin, or Guardian can invite members.' });
+    }
 
     const target = await User.findByPk(userId);
     if (!target) {
