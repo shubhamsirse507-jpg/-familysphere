@@ -49,6 +49,14 @@ export default function App() {
   const [addMemberError, setAddMemberError] = useState('');
   const [addMemberSuccess, setAddMemberSuccess] = useState('');
 
+  const [addMemberTab, setAddMemberTab]             = useState('search'); // 'search' | 'create'
+  const [searchQuery, setSearchQuery]               = useState('');
+  const [searchResult, setSearchResult]             = useState(null);   // { user, status }
+  const [searchError, setSearchError]               = useState('');
+  const [searchLoading, setSearchLoading]           = useState(false);
+  const [inviteLoading, setInviteLoading]           = useState(false);
+  const [inviteSuccess, setInviteSuccess]           = useState('');
+
   const { user, fetchProfile, handleLogout } = useAuth();
   const { activeUsers } = useSocket();
   const {
@@ -77,6 +85,56 @@ export default function App() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  const handleSearchUser = async () => {
+    setSearchError('');
+    setSearchResult(null);
+    setInviteSuccess('');
+    if (!searchQuery.trim()) return;
+    setSearchLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/users/find?query=${encodeURIComponent(searchQuery.trim())}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSearchError(data.error || 'User not found.');
+      } else {
+        setSearchResult(data);
+      }
+    } catch {
+      setSearchError('Connection error.');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleInviteMember = async (userId) => {
+    setInviteLoading(true);
+    setInviteSuccess('');
+    setSearchError('');
+    try {
+      const res = await fetch(`${API_BASE}/family/invite-member`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSearchError(data.error || 'Could not add member.');
+      } else {
+        setInviteSuccess(`✅ ${data.user.name} has been added to your family!`);
+        setSearchResult(null);
+        setSearchQuery('');
+        fetchUsersList(); // Refresh family members in UI
+      }
+    } catch {
+      setSearchError('Connection error.');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   // Handle poll creation from ChatWorkspace
   const handleCreatePoll = (e) => {
@@ -408,85 +466,184 @@ export default function App() {
       {/* Add Family Member Modal */}
       {showAddMemberModal && (
         <div className="modal-backdrop-blur">
-          <div className="modal-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div className="modal-card animate-fade-in" style={{ background: 'var(--bg-secondary)', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto' }}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', color: 'var(--text-primary)' }}>Add Family Member</h3>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Create a new account for someone in the family.</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Find an existing user or create a new account.
+                </p>
               </div>
-              <button className="btn-icon" onClick={() => setShowAddMemberModal(false)}><X size={20} /></button>
+              <button className="btn-icon" onClick={() => { setShowAddMemberModal(false); setSearchResult(null); setSearchQuery(''); setSearchError(''); setInviteSuccess(''); }}>
+                <X size={20} />
+              </button>
             </div>
 
-            {addMemberSuccess && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontSize: '13px', marginBottom: '16px', background: '#d1fae5', padding: '12px', borderRadius: '12px' }}>
-                <ShieldCheck size={18} /><span>{addMemberSuccess}</span>
-              </div>
-            )}
-            {addMemberError && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontSize: '13px', marginBottom: '16px', background: '#fee2e2', padding: '12px', borderRadius: '12px' }}>
-                <ShieldAlert size={18} /><span>{addMemberError}</span>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '4px' }}>
+              {['search', 'create'].map(tab => (
+                <button key={tab} onClick={() => { setAddMemberTab(tab); setSearchError(''); setAddMemberError(''); setInviteSuccess(''); setAddMemberSuccess(''); }}
+                  style={{ flex: 1, padding: '8px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '13px', fontFamily: 'Outfit',
+                    background: addMemberTab === tab ? 'var(--color-primary)' : 'transparent',
+                    color: addMemberTab === tab ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s' }}>
+                  {tab === 'search' ? '🔍 Find User' : '➕ New Account'}
+                </button>
+              ))}
+            </div>
+
+            {/* ── TAB: SEARCH ── */}
+            {addMemberTab === 'search' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Enter the email or phone number of someone who already has a FamilySphere account.
+                </p>
+
+                {inviteSuccess && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: '#d1fae5', color: '#065f46', fontSize: '13px' }}>
+                    <ShieldCheck size={16} /><span>{inviteSuccess}</span>
+                  </div>
+                )}
+                {searchError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: '#fee2e2', color: '#991b1b', fontSize: '13px' }}>
+                    <ShieldAlert size={16} /><span>{searchError}</span>
+                  </div>
+                )}
+
+                {/* Search input + button */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    className="input-field"
+                    style={{ flex: 1 }}
+                    type="text"
+                    placeholder="Email or phone number"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSearchUser()}
+                  />
+                  <button
+                    onClick={handleSearchUser}
+                    disabled={searchLoading || !searchQuery.trim()}
+                    style={{ padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: '700', cursor: 'pointer', fontSize: '14px' }}>
+                    {searchLoading ? '...' : 'Search'}
+                  </button>
+                </div>
+
+                {/* Result card */}
+                {searchResult && (
+                  <div style={{ border: '1px solid var(--border-glass)', borderRadius: '14px', padding: '14px', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Avatar */}
+                    <img
+                      src={searchResult.user.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(searchResult.user.name)}&background=random`}
+                      alt={searchResult.user.name}
+                      style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)' }}>{searchResult.user.name}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{searchResult.user.role}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{searchResult.user.email}</div>
+                    </div>
+                    {/* Action */}
+                    {searchResult.status === 'can_invite' && (
+                      <button
+                        onClick={() => handleInviteMember(searchResult.user.id)}
+                        disabled={inviteLoading}
+                        style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
+                        {inviteLoading ? '...' : 'Add'}
+                      </button>
+                    )}
+                    {searchResult.status === 'already_in_family' && (
+                      <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '600', flexShrink: 0 }}>✓ In family</span>
+                    )}
+                    {searchResult.status === 'in_different_family' && (
+                      <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '600', flexShrink: 0, textAlign: 'right' }}>In another<br/>family</span>
+                    )}
+                    {searchResult.status === 'self' && (
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0 }}>That's you</span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setAddMemberError(''); setAddMemberSuccess('');
-              try {
-                const res = await fetch(`${API_BASE}/auth/signup`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(addMemberForm)
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                  setAddMemberError(typeof data?.error === 'string' ? data.error : data?.message || 'Failed to create account');
-                  return;
+            {/* ── TAB: CREATE ── */}
+            {addMemberTab === 'create' && (
+              <form onSubmit={async e => {
+                e.preventDefault();
+                setAddMemberError(''); setAddMemberSuccess('');
+                try {
+                  const res = await fetch(`${API_BASE}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(addMemberForm)
+                  });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    setAddMemberError(typeof data?.error === 'string' ? data.error : data?.message || 'Failed to create account');
+                    return;
+                  }
+                  setAddMemberSuccess(`✅ ${addMemberForm.name} has been added! They can now log in with ${addMemberForm.email}.`);
+                  setAddMemberForm({ name: '', phone: '', email: '', password: '', role: 'Parent', profilePhoto: '' });
+                  fetchUsersList();
+                } catch {
+                  setAddMemberError('Connection error. Make sure the backend is running.');
                 }
-                setAddMemberSuccess(`✅ ${addMemberForm.name} has been added! They can now log in with ${addMemberForm.email}.`);
-                setAddMemberForm({ name: '', phone: '', email: '', password: '', role: 'Parent', profilePhoto: '' });
-                fetchUsersList();
-              } catch (err) {
-                setAddMemberError('Connection error. Make sure the backend is running.');
-              }
-            }} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Full Name *</label>
-                <input type="text" placeholder="e.g. Samiksha (Parent)" className="input-field" value={addMemberForm.name} onChange={e => setAddMemberForm({ ...addMemberForm, name: e.target.value })} required />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Phone Number *</label>
-                <input type="text" placeholder="+1234567890" className="input-field" value={addMemberForm.phone} onChange={e => setAddMemberForm({ ...addMemberForm, phone: e.target.value })} required />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Email Address *</label>
-                <input type="email" placeholder="samiksha@family.com" className="input-field" value={addMemberForm.email} onChange={e => setAddMemberForm({ ...addMemberForm, email: e.target.value })} required />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Password *</label>
-                <input type="password" placeholder="Min. 6 characters" className="input-field" value={addMemberForm.password} onChange={e => setAddMemberForm({ ...addMemberForm, password: e.target.value })} required minLength={6} />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Family Role *</label>
-                <select className="input-field" value={addMemberForm.role} onChange={e => setAddMemberForm({ ...addMemberForm, role: e.target.value })}>
-                  <option value="Parent">Parent</option>
-                  <option value="Child">Child</option>
-                  <option value="Grandparent">Grandparent</option>
-                  <option value="Guardian">Guardian</option>
-                  <option value="Sibling">Sibling</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Profile Photo URL (optional)</label>
-                <input type="text" placeholder="https://images.unsplash.com/..." className="input-field" value={addMemberForm.profilePhoto} onChange={e => setAddMemberForm({ ...addMemberForm, profilePhoto: e.target.value })} />
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>💡 Leave empty for a default avatar</div>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                <button type="button" onClick={() => setShowAddMemberModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border-glass)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ flex: 2, justifyContent: 'center', padding: '12px', borderRadius: '12px' }}>
-                  <UserPlus size={16} />Add to Family
-                </button>
-              </div>
-            </form>
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                {addMemberSuccess && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: '#d1fae5', color: '#065f46', fontSize: '13px' }}>
+                    <ShieldCheck size={16} /><span>{addMemberSuccess}</span>
+                  </div>
+                )}
+                {addMemberError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: '#fee2e2', color: '#991b1b', fontSize: '13px' }}>
+                    <ShieldAlert size={16} /><span>{addMemberError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Full Name *</label>
+                  <input type="text" placeholder="e.g. Samiksha (Parent)" className="input-field" value={addMemberForm.name} onChange={e => setAddMemberForm({ ...addMemberForm, name: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Phone *</label>
+                  <input type="text" placeholder="+1234567890" className="input-field" value={addMemberForm.phone} onChange={e => setAddMemberForm({ ...addMemberForm, phone: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Email *</label>
+                  <input type="email" placeholder="samiksha@family.com" className="input-field" value={addMemberForm.email} onChange={e => setAddMemberForm({ ...addMemberForm, email: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Password *</label>
+                  <input type="password" placeholder="Min. 6 characters" className="input-field" value={addMemberForm.password} onChange={e => setAddMemberForm({ ...addMemberForm, password: e.target.value })} required minLength={6} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Family Role *</label>
+                  <select className="input-field" value={addMemberForm.role} onChange={e => setAddMemberForm({ ...addMemberForm, role: e.target.value })}>
+                    <option value="Parent">Parent</option>
+                    <option value="Child">Child</option>
+                    <option value="Grandparent">Grandparent</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Sibling">Sibling</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Profile Photo URL (optional)</label>
+                  <input type="text" placeholder="https://images.unsplash.com/..." className="input-field" value={addMemberForm.profilePhoto} onChange={e => setAddMemberForm({ ...addMemberForm, profilePhoto: e.target.value })} />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                  <button type="button" onClick={() => setShowAddMemberModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid var(--border-glass)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" style={{ flex: 2, padding: '12px', borderRadius: '12px', border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <UserPlus size={16} />Add to Family
+                  </button>
+                </div>
+              </form>
+            )}
+
           </div>
         </div>
       )}

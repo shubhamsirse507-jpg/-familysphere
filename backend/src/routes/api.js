@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { protect } from '../middleware/auth.js';
 import {
   signup,
@@ -46,7 +47,7 @@ import { setup2FA, verify2FA, disable2FA } from '../controllers/twoFactorControl
 import { getPosts, createPost, deletePost, likePost, addComment } from '../controllers/postController.js';
 import { reactToMessage } from '../controllers/reactionController.js';
 import { getCircles, createCircle, joinCircle, deleteCircle } from '../controllers/circleController.js';
-import { createFamily, joinFamily, getMyFamily, findUserByEmail, inviteMemberToFamily } from '../controllers/familyController.js';
+import { createFamily, joinFamily, getMyFamily, findUserByContact, inviteMemberToFamily } from '../controllers/familyController.js';
 
 const router = express.Router();
 
@@ -64,8 +65,16 @@ router.post('/family/join', protect, joinFamily);
 router.get('/family/me', protect, getMyFamily);
 router.post('/family/invite-member', protect, inviteMemberToFamily);
 
-// --- User Search (cross-family, by email) ---
-router.get('/users/find', protect, findUserByEmail);
+const findUserLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // Limit each IP to 30 requests per windowMs
+  message: { error: 'Too many search attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// --- User Search (cross-family, by email/phone) ---
+router.get('/users/find', protect, findUserLimiter, findUserByContact);
 
 // --- Chat Routes ---
 router.get('/chats', protect, getChats);

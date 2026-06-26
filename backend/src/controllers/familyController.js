@@ -1,5 +1,6 @@
 import { Family, User } from '../models/index.js';
 import { sendAuthCookies } from './authController.js';
+import { Op } from 'sequelize';
 
 const generateInviteCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -126,21 +127,28 @@ export const getMyFamily = async (req, res) => {
   }
 };
 
-// ── NEW: Search any user by email (cross-family) ──────────────────────────────
-export const findUserByEmail = async (req, res) => {
+// ── NEW: Search any user by email or phone (cross-family) ──────────────────────
+export const findUserByContact = async (req, res) => {
   try {
-    const { email } = req.query;
-    if (!email || email.trim().length < 3) {
-      return res.status(400).json({ error: 'Please provide a valid email to search.' });
+    const { query } = req.query; // single param — can be email OR phone
+    if (!query || query.trim().length < 3) {
+      return res.status(400).json({ error: 'Please enter a valid email or phone number.' });
     }
 
+    const q = query.trim().toLowerCase();
+
     const found = await User.findOne({
-      where: { email: email.trim().toLowerCase() },
-      attributes: ['id', 'name', 'email', 'role', 'profilePhoto', 'familyId'],
+      where: {
+        [Op.or]: [
+          { email: q },
+          { phone: q },
+        ],
+      },
+      attributes: ['id', 'name', 'email', 'phone', 'role', 'profilePhoto', 'familyId'],
     });
 
     if (!found) {
-      return res.status(404).json({ error: 'No user found with that email.' });
+      return res.status(404).json({ error: 'No user found with that email or phone.' });
     }
 
     const myFamilyId = req.user.familyId;
@@ -155,7 +163,14 @@ export const findUserByEmail = async (req, res) => {
       status = 'in_different_family';
     }
 
-    res.json({ user: found.toJSON(), status });
+    // Mask phone for privacy — show only last 4 digits
+    const safeUser = {
+      ...found.toJSON(),
+      phone: found.phone ? '••••' + found.phone.slice(-4) : null,
+      email: found.email, // keep email visible (they searched by it)
+    };
+
+    res.json({ user: safeUser, status });
   } catch (error) {
     console.error('Find user error:', error);
     res.status(500).json({ error: 'Server error' });
