@@ -115,20 +115,20 @@ export default function MessageBubble({
           </span>
         ) : msg.type === 'image' ? (
           <img
-            src={resolveMediaUrl(msg.content)}
+            src={resolveMediaUrl(msg.mediaUrl || msg.content)}
             alt="Shared media"
             style={{ maxWidth: '220px', borderRadius: '10px', cursor: 'pointer' }}
-            onClick={() => setLightboxSrc(resolveMediaUrl(msg.content))}
+            onClick={() => setLightboxSrc(resolveMediaUrl(msg.mediaUrl || msg.content))}
             onError={(e) => { e.target.style.display = 'none'; }}
           />
         ) : msg.type === 'video' ? (
           <video
-            src={resolveMediaUrl(msg.content)}
+            src={resolveMediaUrl(msg.mediaUrl || msg.content)}
             controls
             style={{ maxWidth: '240px', borderRadius: '10px' }}
           />
         ) : msg.type === 'audio' ? (
-          <audio src={resolveMediaUrl(msg.content)} controls style={{ maxWidth: '220px' }} />
+          <audio src={resolveMediaUrl(msg.mediaUrl || msg.content)} controls style={{ maxWidth: '220px' }} />
         ) : msg.type === 'poll' ? (() => {
           let pollData = null;
           try { pollData = JSON.parse(msg.content); } catch (e) { /* skip */ }
