@@ -309,6 +309,19 @@ export function ChatProvider({ children }) {
     }
   };
 
+  // Dedicated poll sender — always uses type='poll' so the bubble renders correctly
+  const sendPollMessage = ({ question, options }) => {
+    if (!socket || !activeChat || !question.trim() || options.length < 2) return;
+    socket.emit('send_message', {
+      chatId: activeChat.id,
+      senderId: user.id,
+      content: JSON.stringify({ question, options }),
+      type: 'poll',
+      pollOptions: options,
+    });
+  };
+
+
   const handleShareLocation = () => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser");
@@ -586,6 +599,7 @@ export function ChatProvider({ children }) {
       fetchChats,
       fetchMessages,
       handleSendMessage,
+      sendPollMessage,
       handleShareLocation,
       handleFileUpload,
       handleDeleteChat,
