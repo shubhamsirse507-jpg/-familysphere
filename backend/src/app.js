@@ -83,7 +83,9 @@ io.use(async (socket, next) => {
     token = cookies.token;
   }
   if (!token) {
-    return next();
+    // Reject unauthenticated sockets — we must know the user identity
+    // so that senderId is always server-verified, never client-supplied.
+    return next(new Error('Authentication required: no token provided'));
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -303,7 +305,14 @@ io.on('connection', (socket) => {
 
   // Send real-time chat message
   socket.on('send_message', async (data) => {
-    const { chatId, senderId, content, type, mediaUrl, replyToId, pollOptions } = data;
+    const { chatId, content, type, mediaUrl, replyToId, pollOptions } = data;
+    // SECURITY: Always use the server-verified identity from the JWT token.
+    // Never trust the client-provided senderId — it can be spoofed or mismatched.
+    const senderId = socket.user?.id;
+    if (!senderId) {
+      console.warn('Unauthenticated send_message attempt — no socket.user set.');
+      return;
+    }
     
     try {
       // Enforce Authorization: Check if sender is a member of the chat

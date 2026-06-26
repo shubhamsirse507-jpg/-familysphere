@@ -140,6 +140,17 @@ export const Message = sequelize.define('Message', {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  // Explicit FK columns — must be declared here so they are always serialized
+  // in JSON responses. Without this, Sequelize may omit them from toJSON() output
+  // when the association is not eagerly loaded, causing isMe to fail on the frontend.
+  senderId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  chatId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   isEdited: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
@@ -149,6 +160,7 @@ export const Message = sequelize.define('Message', {
     defaultValue: false,
   },
 });
+
 
 // --- MessageStatus Model (Tracking sent, delivered, read) ---
 export const MessageStatus = sequelize.define('MessageStatus', {

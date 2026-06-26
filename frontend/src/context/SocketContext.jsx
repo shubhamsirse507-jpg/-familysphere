@@ -30,7 +30,7 @@ export function SocketProvider({ children }) {
     setSocket(socketInstance);
 
     socketInstance.on('connect', () => {
-      socketInstance.emit('auth', user.id);
+      // Socket authentication is now verified via HTTP-only JWT cookies automatically
     });
 
     socketInstance.on('family:updated', () => {
