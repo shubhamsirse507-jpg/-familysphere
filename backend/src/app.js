@@ -664,13 +664,7 @@ const startServer = async () => {
 
 
 
-    // Clear old calls history to ensure no references to removed users (Mom, Dad, Son) remain
-    try {
-      await sequelize.query('DELETE FROM Calls');
-      console.log('✅ All old call history cleared from database on startup.');
-    } catch (callClearErr) {
-      console.error('Error clearing old calls:', callClearErr);
-    }
+    
     
     // Ensure AI profile is in DB
     await ensureAIUser();
