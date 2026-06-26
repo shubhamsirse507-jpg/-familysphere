@@ -224,10 +224,41 @@ const broadcastActiveUsers = async (familyId = null) => {
 };
 
 // Real-time communication via Socket.io
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   // console.log(`Socket connected: ${socket.id}`);
 
-  // User authenticates/joins their personal room to receive notifications/calls
+  // Auto-join: use the server-verified JWT user identity to join rooms immediately
+  if (socket.user) {
+    const userId = socket.user.id;
+    socket.join(userId);
+    socket.userId = userId;
+
+    try {
+      const user = await User.findByPk(userId);
+      if (user) {
+        socket.familyId = user.familyId;
+        if (user.familyId) {
+          socket.join(`family:${user.familyId}`);
+        } else {
+          socket.join('family:none');
+        }
+      }
+
+      await User.update({ isOnline: true, lastSeen: null }, { where: { id: userId } });
+
+      if (user && user.familyId) {
+        io.to(`family:${user.familyId}`).emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
+        await broadcastActiveUsers(user.familyId);
+      } else {
+        io.to('family:none').emit('user_status_changed', { userId, isOnline: true, lastSeen: null });
+        await broadcastActiveUsers(null);
+      }
+    } catch (err) {
+      console.error('Error during auto-join on socket connect:', err);
+    }
+  }
+
+  // Legacy 'auth' event listener — kept for backward compatibility
   socket.on('auth', async (userId) => {
     socket.join(userId);
     socket.userId = userId;

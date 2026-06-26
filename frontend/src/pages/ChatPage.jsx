@@ -33,7 +33,7 @@ export function ChatSidebar() {
       {chats.map(chat => {
         const isTyping = typingUsers[chat.id] && Object.values(typingUsers[chat.id]).some(Boolean);
         const lastMsg = chat.Messages?.[0];
-        const displayMember = chat.isGroup ? null : chat.Users.find(u => u.id !== user.id);
+        const displayMember = chat.isGroup ? null : chat.Users?.find(u => u.id !== user.id);
         
         return (
           <div 
@@ -205,23 +205,23 @@ export function ChatWorkspace() {
               </div>
             )
           ) : (
-            <Avatar user={activeChat.Users.find(u => u.id !== user.id)} size="sm" />
+            <Avatar user={activeChat.Users?.find(u => u.id !== user.id)} size="sm" />
           )}
           
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: '600' }}>
-              {activeChat.isGroup ? activeChat.name : activeChat.Users.find(u => u.id !== user.id)?.name}
+              {activeChat.isGroup ? activeChat.name : activeChat.Users?.find(u => u.id !== user.id)?.name}
             </h3>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               {activeChat.isGroup ? (
-                `${activeChat.Users.length} members`
+                `${activeChat.Users?.length ?? 0} members`
               ) : (
-                activeChat.Users.find(u => u.id !== user.id)?.isOnline ? (
+                activeChat.Users?.find(u => u.id !== user.id)?.isOnline ? (
                   <span style={{ color: 'var(--color-success)', fontWeight: '600' }}>Online</span>
-                ) : activeChat.Users.find(u => u.id !== user.id)?.lastSeen ? (
-                  `Last seen: ${new Date(activeChat.Users.find(u => u.id !== user.id).lastSeen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+                ) : activeChat.Users?.find(u => u.id !== user.id)?.lastSeen ? (
+                  `Last seen: ${new Date(activeChat.Users?.find(u => u.id !== user.id)?.lastSeen).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
                 ) : (
-                  activeChat.Users.find(u => u.id !== user.id)?.role
+                  activeChat.Users?.find(u => u.id !== user.id)?.role
                 )
               )}
             </p>
@@ -231,7 +231,7 @@ export function ChatWorkspace() {
         {/* Call Controls & Options */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {(() => {
-            const partner = activeChat.isGroup ? null : activeChat.Users.find(u => u.id !== user.id);
+            const partner = activeChat.isGroup ? null : activeChat.Users?.find(u => u.id !== user.id);
             const isBlocked = partner?.isBlocked || partner?.isBlockingMe;
             return (
               <>
@@ -382,7 +382,7 @@ export function ChatWorkspace() {
 
       {/* Chat message composer input form */}
       {(() => {
-        const partner = activeChat.isGroup ? null : activeChat.Users.find(u => u.id !== user.id);
+        const partner = activeChat.isGroup ? null : activeChat.Users?.find(u => u.id !== user.id);
         const isBlocked = partner?.isBlocked || partner?.isBlockingMe;
         return (
           <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px', padding: '16px 20px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-glass)', alignItems: 'center' }}>

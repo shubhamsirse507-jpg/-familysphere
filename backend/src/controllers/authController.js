@@ -39,7 +39,7 @@ export const sendAuthCookies = (res, user, sessionId) => {
   const cookieOptions = (maxAge) => ({
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
     maxAge,
   });
 

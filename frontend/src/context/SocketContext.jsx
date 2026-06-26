@@ -33,6 +33,10 @@ export function SocketProvider({ children }) {
       // Socket authentication is now verified via HTTP-only JWT cookies automatically
     });
 
+    socketInstance.on('connect_error', (err) => {
+      console.warn('[Socket] Connection error:', err.message);
+    });
+
     socketInstance.on('family:updated', () => {
       console.log('[Socket] Family updated, reconnecting socket to fetch new JWT cookies...');
       socketInstance.disconnect();

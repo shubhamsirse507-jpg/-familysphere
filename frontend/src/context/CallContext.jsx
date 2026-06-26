@@ -303,7 +303,7 @@ export function CallProvider({ children }) {
   const startOutboundCall = (type) => {
     if (!activeChat) return;
     const isGroup = activeChat.isGroup;
-    const partner = activeChat.Users.find(u => u.id !== user.id);
+    const partner = activeChat.Users?.find(u => u.id !== user.id);
     if (!partner && !isGroup) return;
 
     const callDetails = {
