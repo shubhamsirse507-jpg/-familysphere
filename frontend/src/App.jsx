@@ -276,18 +276,17 @@ export default function App() {
         {mobileWorkspaceActive && ['together', 'settings'].includes(activeTab) && (
           <div className="mobile-workspace-header" style={{
             alignItems: 'center',
-            padding: '12px 20px',
+            padding: '10px 16px',
             background: 'var(--bg-secondary)',
-            borderBottom: '1px solid var(--border-glass)',
-            gap: '12px'
+            borderBottom: '1px solid var(--border-glass)'
           }}>
             <button 
               className="btn-icon" 
               onClick={() => setMobileWorkspaceActive(false)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: '600' }}
+              style={{ display: 'flex', alignItems: 'center', padding: '4px' }}
+              title="Go back"
             >
               <ChevronRight size={20} style={{ transform: 'rotate(180deg)', color: 'var(--color-primary)' }} />
-              <span style={{ color: 'var(--text-primary)' }}>Back to Menu</span>
             </button>
           </div>
         )}
