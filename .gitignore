@@ -55,3 +55,4 @@ backend/public/uploads/
 check_*.js
 console.log('Backend
 u.name)))
+frontend/.env.local

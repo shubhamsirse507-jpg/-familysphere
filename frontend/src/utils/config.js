@@ -6,7 +6,7 @@ export const IS_CAPACITOR =
   (window.location.hostname === 'localhost' && !window.location.port);
 
 // Set this to your PC's LAN IP when building the Android APK.
-export const BACKEND_LAN_IP = '10.55.22.92';
+export const BACKEND_LAN_IP = import.meta.env.VITE_BACKEND_LAN_IP || '10.55.22.92';
 export const BACKEND_PORT = '5000';
 
 export const IS_PROD_BUILD = import.meta.env.PROD;
