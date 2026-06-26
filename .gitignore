@@ -51,3 +51,7 @@ find.js
 
 # User uploads
 backend/public/uploads/
+*.zip
+check_*.js
+console.log('Backend
+u.name)))

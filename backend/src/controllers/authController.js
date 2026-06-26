@@ -14,7 +14,12 @@ import { familyWhere } from '../utils/family.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'familysphere_super_secret_key_12345';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set in environment variables.');
+  process.exit(1);
+}
+
 
 const generateAccessToken = (user, sessionId) => {
   return jwt.sign(
