@@ -718,8 +718,8 @@ export default function App() {
 
       {/* Global CSS helpers */}
       <style>{`
-        .sidebar { overflow: hidden; }
         html, body, #root { height: 100%; }
+        .sidebar { overflow: hidden; }
         .app-container { display: flex; height: 100vh; overflow: hidden; background: var(--bg-primary); }
         .detail-area { flex: 1; display: none; flex-direction: column; overflow: hidden; }
         .detail-area.active { display: flex; }
@@ -730,12 +730,6 @@ export default function App() {
           .detail-area { display: flex; }
         }
         @media (max-width: 768px) {
-          .app-container { height: 100% !important; border: none !important; border-radius: 0 !important; }
-          .sidebar { display: flex; width: 100%; flex-direction: column; background: var(--bg-secondary); height: calc(100% - 68px) !important; overflow: hidden; }
-          .sidebar.hidden { display: none; }
-          .detail-area { width: 100%; height: calc(100% - 68px) !important; }
-          .detail-area.active { display: flex; }
-          .detail-area.chat-active { height: 100% !important; }
           .mobile-workspace-header { display: flex !important; }
           .bottom-nav { justify-content: space-around; padding: 0 4px; gap: 0; }
           .nav-btn { min-width: auto; flex: 1; padding: 6px 4px; font-size: 9px; }
