@@ -32,6 +32,7 @@ export default function MessageBubble({
   onPin,
   onTranslate,
   onDelete,
+  onCastVote,
 }) {
   const isAi = msg.sender?.role === 'AI';
 
@@ -132,13 +133,54 @@ export default function MessageBubble({
         ) : msg.type === 'poll' ? (() => {
           let pollData = null;
           try { pollData = JSON.parse(msg.content); } catch (e) { /* skip */ }
-          if (!pollData) return <span>{msg.content}</span>;
+          const question = pollData?.question || 'Poll';
+          const options = msg.PollOptions || [];
+
+          if (options.length > 0) {
+            return (
+              <div style={{ minWidth: '200px' }}>
+                <div style={{ fontWeight: '700', marginBottom: '10px', fontSize: '14px' }}>
+                  📊 {question}
+                </div>
+                {options.map((opt) => {
+                  const voteCount = opt.PollVotes?.length || 0;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => onCastVote && onCastVote(opt.id)}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        width: '100%', padding: '8px 12px', borderRadius: '8px', marginBottom: '6px',
+                        background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)',
+                        cursor: 'pointer', fontSize: '13px', color: 'inherit', textAlign: 'left',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                    >
+                      <span>{opt.optionText}</span>
+                      <span style={{
+                        fontWeight: '700', fontSize: '11px',
+                        background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '10px',
+                        marginLeft: '10px', whiteSpace: 'nowrap'
+                      }}>
+                        {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          // Fallback to static list if database options are not loaded yet
+          const staticOptions = pollData?.options || [];
           return (
             <div style={{ minWidth: '180px' }}>
               <div style={{ fontWeight: '700', marginBottom: '8px', fontSize: '13px' }}>
-                📊 {pollData.question}
+                📊 {question}
               </div>
-              {pollData.options?.map((opt, idx) => (
+              {staticOptions.map((opt, idx) => (
                 <div key={idx} style={{
                   padding: '6px 10px', borderRadius: '8px', marginBottom: '4px', fontSize: '13px',
                   background: 'rgba(255,255,255,0.12)', cursor: 'default'

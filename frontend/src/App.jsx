@@ -67,6 +67,7 @@ export default function App() {
     incomingNotification, setIncomingNotification,
     handleNotificationClick,
     handleSendMessage,
+    sendPollMessage,
     fetchUsersList,
     showAddChatModal, setShowAddChatModal,
     newChatConfig, setNewChatConfig,
@@ -142,7 +143,7 @@ export default function App() {
     e.preventDefault();
     if (!pollForm.question.trim() || !pollForm.option1.trim() || !pollForm.option2.trim()) return;
     const options = [pollForm.option1, pollForm.option2, pollForm.option3].filter(Boolean);
-    handleSendMessage(null, JSON.stringify({ question: pollForm.question, options }));
+    sendPollMessage({ question: pollForm.question, options });
     setShowPollBuilder(false);
     setPollForm({ question: '', option1: '', option2: '', option3: '' });
   };

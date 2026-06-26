@@ -353,6 +353,7 @@ export function ChatWorkspace() {
               onPin={handlePinMessage}
               onTranslate={handleTranslateMessage}
               onDelete={handleDeleteMessage}
+              onCastVote={handleCastVote}
             />
           ))
         )}
