@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check } from 'lucide-react';
+import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check, ChevronRight } from 'lucide-react';
 import { API_BASE } from './utils/config.js';
 import useAuth from './hooks/useAuth.js';
 import useSocket from './hooks/useSocket.js';
@@ -42,6 +42,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('chats');
   const [activeSettingsSubTab, setActiveSettingsSubTab] = useState('account');
   const [togetherSubTab, setTogetherSubTab] = useState('feed');
+  const [mobileWorkspaceActive, setMobileWorkspaceActive] = useState(false);
 
   // Global modals (not page-specific)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
@@ -240,24 +241,56 @@ export default function App() {
           {activeTab === 'together' && (
             <FeedSidebar
               togetherSubTab={togetherSubTab}
-              setTogetherSubTab={setTogetherSubTab}
+              setTogetherSubTab={(tabId) => {
+                setTogetherSubTab(tabId);
+                setMobileWorkspaceActive(true);
+              }}
               feedPosts={0} sharedPhotos={0} circlesList={0} stories={0}
             />
           )}
           {activeTab === 'settings' && (
             <SettingsSidebar
               activeSettingsSubTab={activeSettingsSubTab}
-              setActiveSettingsSubTab={setActiveSettingsSubTab}
+              setActiveSettingsSubTab={(tabId) => {
+                setActiveSettingsSubTab(tabId);
+                setMobileWorkspaceActive(true);
+              }}
             />
           )}
         </div>
 
         {/* Bottom navigation */}
-        <NavBar activeTab={activeTab} setActiveTab={setActiveTab} setActiveChat={setActiveChat} />
+        <NavBar 
+          activeTab={activeTab} 
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setMobileWorkspaceActive(false);
+          }} 
+          setActiveChat={setActiveChat} 
+        />
       </div>
 
       {/* ── 2. Detail / Workspace Area ──────────────────────────── */}
-      <div className={`detail-area ${activeChat || ['together', 'settings', 'ai'].includes(activeTab) ? 'active' : ''}`}>
+      <div className={`detail-area ${activeChat || (['together', 'settings'].includes(activeTab) && mobileWorkspaceActive) ? 'active' : ''}`}>
+        {/* Mobile Back Header */}
+        {mobileWorkspaceActive && ['together', 'settings'].includes(activeTab) && (
+          <div className="mobile-workspace-header" style={{
+            alignItems: 'center',
+            padding: '12px 20px',
+            background: 'var(--bg-secondary)',
+            borderBottom: '1px solid var(--border-glass)',
+            gap: '12px'
+          }}>
+            <button 
+              className="btn-icon" 
+              onClick={() => setMobileWorkspaceActive(false)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: '600' }}
+            >
+              <ChevronRight size={20} style={{ transform: 'rotate(180deg)', color: 'var(--color-primary)' }} />
+              <span style={{ color: 'var(--text-primary)' }}>Back to Menu</span>
+            </button>
+          </div>
+        )}
         {activeTab === 'chats' && <ChatWorkspace />}
         {activeTab === 'together' && <FeedWorkspace togetherSubTab={togetherSubTab} />}
         {activeTab === 'settings' && <SettingsWorkspace activeSettingsSubTab={activeSettingsSubTab} />}
@@ -691,6 +724,7 @@ export default function App() {
         .app-container { display: flex; height: 100vh; overflow: hidden; background: var(--bg-primary); }
         .detail-area { flex: 1; display: none; flex-direction: column; overflow: hidden; }
         .detail-area.active { display: flex; }
+        .mobile-workspace-header { display: none; }
         @media (min-width: 769px) {
           .sidebar { display: flex !important; width: 360px; min-width: 300px; flex-direction: column; border-right: 1px solid var(--border-glass); background: var(--bg-secondary); height: 100vh; overflow: hidden; }
           .sidebar.hidden { display: flex !important; }
@@ -700,6 +734,9 @@ export default function App() {
           .sidebar { display: flex; width: 100%; flex-direction: column; background: var(--bg-secondary); height: 100vh; overflow: hidden; }
           .sidebar.hidden { display: none; }
           .detail-area { width: 100%; }
+          .mobile-workspace-header { display: flex !important; }
+          .bottom-nav { justify-content: space-around; padding: 0 4px; gap: 0; }
+          .nav-btn { min-width: auto; flex: 1; padding: 6px 4px; font-size: 9px; }
         }
         .in-app-notification-toast {
           position: fixed; top: 24px; right: 24px; z-index: 10000;
