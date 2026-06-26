@@ -546,23 +546,35 @@ export default function App() {
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{searchResult.user.role}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{searchResult.user.email}</div>
                     </div>
-                    {/* Action */}
-                    {searchResult.status === 'can_invite' && (
-                      <button
-                        onClick={() => handleInviteMember(searchResult.user.id)}
-                        disabled={inviteLoading}
-                        style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
-                        {inviteLoading ? '...' : 'Add'}
-                      </button>
-                    )}
-                    {searchResult.status === 'already_in_family' && (
-                      <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '600', flexShrink: 0 }}>✓ In family</span>
-                    )}
-                    {searchResult.status === 'in_different_family' && (
-                      <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '600', flexShrink: 0, textAlign: 'right' }}>In another<br/>family</span>
-                    )}
-                    {searchResult.status === 'self' && (
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0 }}>That's you</span>
+                    {/* Action — show Add button for any status except already_in_family */}
+                    {searchResult.status === 'already_in_family' ? (
+                      <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '600', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        ✓ Already in family
+                      </span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                        {searchResult.status === 'in_different_family' && (
+                          <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: '600' }}>In another family</span>
+                        )}
+                        {searchResult.status === 'self' && (
+                          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>You</span>
+                        )}
+                        <button
+                          onClick={() => handleInviteMember(searchResult.user.id)}
+                          disabled={inviteLoading}
+                          style={{
+                            padding: '8px 16px', borderRadius: '10px', border: 'none',
+                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                            color: '#fff', fontWeight: '700', fontSize: '13px',
+                            cursor: inviteLoading ? 'not-allowed' : 'pointer',
+                            opacity: inviteLoading ? 0.7 : 1,
+                            display: 'flex', alignItems: 'center', gap: '5px',
+                            boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+                            transition: 'all 0.2s'
+                          }}>
+                          <UserPlus size={14} />{inviteLoading ? 'Adding...' : 'Add'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
