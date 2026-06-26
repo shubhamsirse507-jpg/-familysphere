@@ -158,7 +158,7 @@ export default function App() {
       {activeCall && <CallScreen />}
 
       {/* ── 1. Sidebar ──────────────────────────────────────────── */}
-      <div className={`sidebar ${activeChat ? 'hidden' : ''}`}>
+      <div className={`sidebar ${activeChat || mobileWorkspaceActive ? 'hidden' : ''}`}>
 
         {/* Sidebar Header */}
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -724,6 +724,7 @@ export default function App() {
         .detail-area { flex: 1; display: none; flex-direction: column; overflow: hidden; }
         .detail-area.active { display: flex; }
         .mobile-workspace-header { display: none; }
+        .chat-back-btn { display: none !important; }
         @media (min-width: 769px) {
           .sidebar { display: flex !important; width: 360px; min-width: 300px; flex-direction: column; border-right: 1px solid var(--border-glass); background: var(--bg-secondary); height: 100vh; overflow: hidden; }
           .sidebar.hidden { display: flex !important; }
@@ -731,6 +732,7 @@ export default function App() {
         }
         @media (max-width: 768px) {
           .mobile-workspace-header { display: flex !important; }
+          .chat-back-btn { display: flex !important; }
           .bottom-nav { justify-content: space-around; padding: 0 4px; gap: 0; }
           .nav-btn { min-width: auto; flex: 1; padding: 6px 4px; font-size: 9px; }
         }

@@ -189,8 +189,8 @@ export function ChatWorkspace() {
       <div style={{ padding: '16px 20px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button 
-            className="btn-icon" 
-            style={{ marginRight: '4px', display: window.innerWidth <= 768 ? 'flex' : 'none' }}
+            className="btn-icon chat-back-btn" 
+            style={{ marginRight: '4px' }}
             onClick={() => setActiveChat(null)}
           >
             <ChevronRight size={20} style={{ transform: 'rotate(180deg)' }} />
