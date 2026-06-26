@@ -122,13 +122,13 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // (re-enable before production by restoring max: 10 and uncommenting the app.use lines)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10000, // effectively disabled
+  max: process.env.NODE_ENV === 'production' ? 10 : 10000, // effectively disabled Beacuse App is in Production mode
   message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
-// app.use('/api/auth/login', authLimiter);   // TEMPORARILY DISABLED
-// app.use('/api/auth/signup', authLimiter);  // TEMPORARILY DISABLED
+ app.use('/api/auth/login', authLimiter);   // TEMPORARILY DISABLED
+ app.use('/api/auth/signup', authLimiter);  // TEMPORARILY DISABLED
 
 // General API rate limit — 100 requests per minute per IP
 const generalLimiter = rateLimit({
