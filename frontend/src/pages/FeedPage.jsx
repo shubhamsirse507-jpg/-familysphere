@@ -475,7 +475,7 @@ function CirclesSubTab({ user, socket }) {
 // ─── Main Feed Page (Together Tab) ────────────────────────────────────────────
 export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, sharedPhotos, circlesList, stories }) {
   return (
-    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'hidden' }}>
+    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <div>
         <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>Together</h3>
         <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Family Feed, Memories, Circles & Map</p>
