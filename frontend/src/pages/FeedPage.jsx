@@ -493,6 +493,7 @@ export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, shar
         <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Family Feed, Memories, Circles &amp; Map</p>
       </div>
 
+<<<<<<< HEAD
       {/* 2. Tab Navigation - Horizontal Pill Row (fixed) */}
       <div style={{
         display: 'flex',
@@ -535,6 +536,34 @@ export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, shar
             </button>
           );
         })}
+=======
+      {/* Sub-tab switcher */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {[
+          { id: 'feed', icon: '📰', label: 'Family Feed', desc: 'Posts & updates' },
+          { id: 'memories', icon: '📷', label: 'Memories', desc: 'Shared photos & videos' },
+          { id: 'circles', icon: '⭕', label: 'Circles', desc: 'Interest groups' },
+          { id: 'map', icon: '📍', label: 'Family Map', desc: 'Live locations' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setTogetherSubTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '12px 14px', borderRadius: '14px', width: '100%',
+              background: togetherSubTab === tab.id ? 'var(--color-primary-light)' : 'var(--bg-tertiary)',
+              border: togetherSubTab === tab.id ? '1.5px solid var(--color-primary)' : '1.5px solid transparent',
+              cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s'
+            }}
+          >
+            <span style={{ fontSize: '22px', lineHeight: 1 }}>{tab.icon}</span>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: togetherSubTab === tab.id ? 'var(--color-primary)' : 'var(--text-primary)' }}>{tab.label}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{tab.desc}</div>
+            </div>
+          </button>
+        ))}
+>>>>>>> 317d1a60612f6df6698bd4f69e3629b14a077e35
       </div>
 
       {/* 3. Scrollable Content Area (flex: 1, overflow-y: auto) */}
