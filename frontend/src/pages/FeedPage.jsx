@@ -105,14 +105,6 @@ function FeedSubTab({ user, socket }) {
           />
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <input
-            type="text"
-            placeholder="Image URL (optional)..."
-            className="input-field"
-            style={{ flex: 1, fontSize: '12px' }}
-            value={newPostImage}
-            onChange={(e) => setNewPostImage(e.target.value)}
-          />
           <button type="submit" className="btn-primary" style={{ padding: '10px 18px', fontSize: '13px' }}>
             Post
           </button>
@@ -265,7 +257,7 @@ function MemoriesSubTab({ user }) {
       if (sourceType === 'local' && uploadFile) {
         const fd = new FormData();
         fd.append('file', uploadFile);
-        const up = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+        const up = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd, credentials: 'include' });
         if (!up.ok) { setError('Upload failed.'); setUploading(false); return; }
         const d = await up.json();
         finalUrl = d.url;
@@ -273,6 +265,7 @@ function MemoriesSubTab({ user }) {
       const res = await fetch(`${API_BASE}/memories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ title, description: desc, mediaUrl: finalUrl, sourceType })
       });
       if (res.ok) {
