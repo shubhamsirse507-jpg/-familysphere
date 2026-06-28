@@ -23,15 +23,9 @@ export function SocketProvider({ children }) {
     }
 
     const socketInstance = io(SOCKET_BASE, {
-  withCredentials: true,
+    withCredentials: true,
     auth: { token: localStorage.getItem("socket_token") || "" },
-  auth: {
-    token: document.cookie
-      .split('; ')
-      .find(row => row.startsWith('token='))
-      ?.split('=')[1] || ''
-  }
-      });
+    });
 
     socketRef.current = socketInstance;
     setSocket(socketInstance);
