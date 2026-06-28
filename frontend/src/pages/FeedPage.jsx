@@ -58,7 +58,7 @@ function FeedSubTab({ user, socket }) {
     try {
       const res = await fetch(`${API_BASE}/posts`, {        
         method: 'POST',
-	credentials: 'include'
+	credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newPostText, mediaUrl: newPostImage })
       });
