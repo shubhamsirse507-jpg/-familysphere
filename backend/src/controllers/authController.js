@@ -326,15 +326,17 @@ export const login = async (req, res) => {
 
     sendAuthCookies(res, user, sessionId);
 
-    res.json({
-      id: user.id,
-      name: user.name,
-      phone: user.phone,
-      email: user.email,
-      role: user.role,
-      profilePhoto: user.profilePhoto,
-      familyId: user.familyId,
-    });
+    const accessToken = generateAccessToken(user, sessionId);
+res.json({
+  id: user.id,
+  name: user.name,
+  phone: user.phone,
+  email: user.email,
+  role: user.role,
+  profilePhoto: user.profilePhoto,
+  familyId: user.familyId,
+  token: accessToken,
+});
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login' });

@@ -24,6 +24,7 @@ export function SocketProvider({ children }) {
 
     const socketInstance = io(SOCKET_BASE, {
   withCredentials: true,
+    auth: { token: localStorage.getItem("socket_token") || "" },
   auth: {
     token: document.cookie
       .split('; ')

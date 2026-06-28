@@ -19,7 +19,8 @@ export function AuthProvider({ children }) {
       const res = await fetch(`${API_BASE}/auth/profile`);
       if (res.ok) {
         const data = await res.json();
-        setUser(data);
+        if (data.token) { localStorage.setItem("socket_token", data.token); }
+      setUser(data);
       } else {
         const data = await res.json().catch(() => ({}));
         if (data.code === 'SESSION_REPLACED') {
@@ -90,6 +91,7 @@ export function AuthProvider({ children }) {
         return;
       }
       
+      if (data.token) { localStorage.setItem("socket_token", data.token); }
       setUser(data);
       setTwoFARequired(false);
       setLogin2FACode('');
