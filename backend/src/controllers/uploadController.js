@@ -21,7 +21,7 @@ export const uploadMedia = async (req, res) => {
     // Build the public-accessible URL path for this file
     // Files are stored at: public/uploads/{userId}/{randomFilename}
     // Served as static at: /uploads/{userId}/{randomFilename}
-    const fileUrl = `/uploads/${userId}/${req.file.filename}`;
+    const fileUrl = req.file.path;
 
     return res.status(200).json({
       url: fileUrl,
