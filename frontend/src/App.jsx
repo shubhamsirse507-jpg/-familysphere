@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check, ChevronRight, Bell } from 'lucide-react';
+import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check, ChevronRight, Bell, MoreVertical } from 'lucide-react';
 import { API_BASE } from './utils/config.js';
 import useAuth from './hooks/useAuth.js';
 import useSocket from './hooks/useSocket.js';
@@ -62,6 +62,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showThreeDotsMenu, setShowThreeDotsMenu] = useState(false);
 
   const { user, fetchProfile, handleLogout } = useAuth();
   const { socket, activeUsers } = useSocket();
@@ -92,6 +93,16 @@ export default function App() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // WhatsApp-style toast auto-dismiss (4 seconds)
+  useEffect(() => {
+    if (incomingNotification) {
+      const timer = setTimeout(() => {
+        setIncomingNotification(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [incomingNotification, setIncomingNotification]);
 
   const handleSearchUser = async () => {
     setSearchError('');
@@ -306,37 +317,85 @@ export default function App() {
             <h2 style={{ fontSize: '20px', fontFamily: 'Outfit', fontWeight: '800' }}>FamilySphere</h2>
           </div>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            <button className="btn-icon" title="Add Family Member" onClick={() => { setAddMemberError(''); setAddMemberSuccess(''); setShowAddMemberModal(true); }}>
-              <UserPlus size={18} />
-            </button>
-
-            {/* ── Unified Notification Bell ─────────────────────── */}
             <div style={{ position: 'relative' }}>
               <button
                 className="btn-icon"
-                title="Notifications"
-                onClick={() => setShowNotificationDropdown(v => !v)}
+                title="More options"
+                onClick={() => {
+                  setShowThreeDotsMenu(v => !v);
+                  setShowNotificationDropdown(false); // Close dropdown if opening menu
+                }}
                 style={{ position: 'relative' }}
               >
-                <Bell size={18} />
+                <MoreVertical size={18} />
                 {unreadCount > 0 && (
                   <span style={{
-                    position: 'absolute', top: '-3px', right: '-3px',
-                    background: 'linear-gradient(135deg,#ef4444,#dc2626)',
-                    color: '#fff', borderRadius: '50%', fontSize: '9px',
-                    width: '16px', height: '16px', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    fontWeight: '800', boxShadow: '0 0 0 2px var(--bg-secondary)',
-                    animation: 'notif-pop 0.3s cubic-bezier(0.34,1.56,0.64,1)'
-                  }}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
+                    position: 'absolute', top: '-2px', right: '-2px',
+                    background: '#ef4444',
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    boxShadow: '0 0 0 2px var(--bg-secondary)'
+                  }} />
                 )}
               </button>
 
+              {/* Three Dots Menu Drawer/Dropdown */}
+              {showThreeDotsMenu && (
+                <div className="three-dots-backdrop" onClick={() => setShowThreeDotsMenu(false)}>
+                  <div className="three-dots-menu-panel animate-slide-up" onClick={e => e.stopPropagation()}>
+                    <div className="three-dots-drag-handle" />
+                    <div className="three-dots-options-list">
+                      <button className="three-dots-item" onClick={() => {
+                        setShowThreeDotsMenu(false);
+                        setShowNotificationDropdown(true);
+                      }}>
+                        <span className="three-dots-icon" style={{ fontSize: '16px' }}>🔔</span>
+                        <span className="three-dots-label" style={{ flex: 1 }}>Notifications</span>
+                        {unreadCount > 0 && (
+                          <span className="three-dots-badge">{unreadCount}</span>
+                        )}
+                      </button>
+
+                      <button className="three-dots-item" onClick={() => {
+                        setShowThreeDotsMenu(false);
+                        setAddMemberError('');
+                        setAddMemberSuccess('');
+                        setShowAddMemberModal(true);
+                      }}>
+                        <span className="three-dots-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                          <UserPlus size={18} />
+                        </span>
+                        <span className="three-dots-label">Add Family Member</span>
+                      </button>
+
+                      <button className="three-dots-item" onClick={() => {
+                        setTheme(theme === 'light' ? 'dark' : 'light');
+                      }}>
+                        <span className="three-dots-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                          {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                        </span>
+                        <span className="three-dots-label">
+                          {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                        </span>
+                      </button>
+
+                      <button className="three-dots-item" onClick={() => {
+                        setShowThreeDotsMenu(false);
+                        handleLogout();
+                      }} style={{ color: '#ef4444' }}>
+                        <span className="three-dots-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                          <LogOut size={18} />
+                        </span>
+                        <span className="three-dots-label">Logout</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Unified Notification Dropdown ─────────────────── */}
               {showNotificationDropdown && (
                 <div style={{
-                  position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
                   width: '320px', maxHeight: '440px',
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-glass)',
@@ -426,12 +485,6 @@ export default function App() {
                 </div>
               )}
             </div>
-            {/* ─────────────────────────────────────────────────── */}
-
-            <button className="btn-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-            <button className="btn-icon" onClick={handleLogout}><LogOut size={18} /></button>
           </div>
         </div>
 
@@ -948,28 +1001,71 @@ export default function App() {
       )}
 
       {/* In-app Notification Toast */}
-      {incomingNotification && (
-        <div className="in-app-notification-toast" onClick={() => handleNotificationClick(incomingNotification)}>
-          <div className="toast-avatar-container">
-            <Avatar user={{ name: incomingNotification.senderName, profilePhoto: incomingNotification.senderAvatar }} size="sm" />
-          </div>
-          <div className="toast-content">
-            <div className="toast-header">
-              <span className="toast-title">{incomingNotification.senderName}</span>
-              <span className="toast-time">now</span>
+      {incomingNotification && (() => {
+        const getToastEmoji = (type) => {
+          switch (type) {
+            case 'image': return '📷';
+            case 'video': return '🎥';
+            case 'poll': return '📊';
+            case 'call':
+            case 'missed_call': return '📞';
+            default: return '💬';
+          }
+        };
+        return (
+          <div 
+            className="in-app-notification-toast" 
+            onClick={() => {
+              handleNotificationClick(incomingNotification);
+              setIncomingNotification(null);
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              width: '100%'
+            }}>
+              {/* App icon/emoji on the left */}
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px',
+                flexShrink: 0
+              }}>
+                {getToastEmoji(incomingNotification.type)}
+              </div>
+              
+              {/* Content area */}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {/* App name (bold top left) and "now" timestamp (top right) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#10b981', letterSpacing: '0.5px' }}>FamilySphere</span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)' }}>now</span>
+                </div>
+                
+                {/* Bold title below app name (sender name) */}
+                <div style={{ fontWeight: '700', fontSize: '14px', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {incomingNotification.senderName}
+                </div>
+                
+                {/* Sender/body text below title */}
+                <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {incomingNotification.type === 'image' && '📷 Photo'}
+                  {incomingNotification.type === 'video' && '🎥 Video'}
+                  {incomingNotification.type === 'poll' && '📊 Poll: '}
+                  {incomingNotification.content || ''}
+                </p>
+              </div>
             </div>
-            <p className="toast-message">
-              {incomingNotification.type === 'image' && '📷 Photo'}
-              {incomingNotification.type === 'video' && '🎥 Video'}
-              {incomingNotification.type === 'poll' && '📊 Poll: '}
-              {incomingNotification.content || ''}
-            </p>
           </div>
-          <button className="toast-close-btn" onClick={(e) => { e.stopPropagation(); setIncomingNotification(null); }}>
-            <X size={14} />
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Global CSS helpers */}
       <style>{`
@@ -991,23 +1087,153 @@ export default function App() {
           .bottom-nav { justify-content: space-around; padding: 0 4px; gap: 0; }
           .nav-btn { min-width: auto; flex: 1; padding: 6px 4px; font-size: 9px; }
         }
-        .in-app-notification-toast {
-          position: fixed; top: 24px; right: 24px; z-index: 10000;
-          display: flex; align-items: center; gap: 12px; width: 340px;
-          padding: 14px 16px; background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.4);
-          border-radius: var(--radius-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-          cursor: pointer; animation: slideInDown 0.4s cubic-bezier(0.16,1,0.3,1) forwards;
+
+        /* Three-dots menu styles */
+        .three-dots-backdrop {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          z-index: 2999;
+          background: transparent;
         }
-        [data-theme="dark"] .in-app-notification-toast { background: rgba(20,26,38,0.85); border-color: rgba(255,255,255,0.08); }
-        .toast-content { flex: 1; min-width: 0; }
-        .toast-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-        .toast-title { font-weight: 700; font-size: 14px; color: var(--text-primary); font-family: var(--font-display); }
-        .toast-time { font-size: 11px; color: var(--text-tertiary); }
-        .toast-message { font-size: 13px; color: var(--text-secondary); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .toast-close-btn { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-tertiary); cursor: pointer; }
-        @keyframes slideInDown { from { transform: translateY(-100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @media (max-width: 480px) { .in-app-notification-toast { top: 10px; left: 10px; right: 10px; width: auto; } }
+        .three-dots-menu-panel {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          width: 220px;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-glass);
+          border-radius: 16px;
+          box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+          z-index: 3000;
+          padding: 8px;
+          animation: fadeIn 0.2s ease-out forwards;
+        }
+        .three-dots-drag-handle {
+          display: none;
+        }
+        .three-dots-options-list {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .three-dots-item {
+          width: 100%;
+          height: 40px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 0 12px;
+          border-radius: 10px;
+          background: transparent;
+          border: none;
+          color: var(--text-primary);
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          text-align: left;
+          transition: background 0.15s;
+        }
+        .three-dots-item:hover {
+          background: rgba(99, 102, 241, 0.08);
+        }
+        .three-dots-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+        }
+        .three-dots-badge {
+          background: #ef4444;
+          color: #fff;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 800;
+          padding: 2px 8px;
+        }
+
+        @media (max-width: 768px) {
+          .three-dots-backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 5000;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+          }
+          .three-dots-menu-panel {
+            position: static;
+            width: 100%;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            padding: 12px 16px 32px 16px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid var(--border-glass);
+            border-bottom: none;
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .three-dots-drag-handle {
+            display: block;
+            width: 40px;
+            height: 4px;
+            background: var(--text-tertiary);
+            border-radius: 2px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+          }
+          .three-dots-options-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .three-dots-item {
+            height: 56px;
+            gap: 16px;
+            padding: 0 16px;
+            border-radius: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-glass);
+            font-size: 15px;
+          }
+          .three-dots-item:active {
+            background: var(--color-primary-light);
+          }
+        }
+
+        /* Toast styles */
+        .in-app-notification-toast {
+          position: fixed;
+          top: 24px;
+          right: 24px;
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          width: 360px;
+          max-width: 360px;
+          padding: 12px 16px;
+          background: rgba(30, 30, 30, 0.92) !important;
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+          cursor: pointer;
+          animation: slideInDown 0.4s cubic-bezier(0.16,1,0.3,1) forwards;
+          color: #fff !important;
+          box-sizing: border-box;
+        }
+        @media (max-width: 768px) {
+          .in-app-notification-toast {
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            width: auto;
+            max-width: none;
+          }
+        }
       `}</style>
     </div>
   );
