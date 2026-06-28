@@ -90,6 +90,18 @@ export const runSeeding = async (force = true) => {
     try {
       await sequelize.query("ALTER TABLE Circles ADD COLUMN familyId CHAR(36);");
     } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Users ADD COLUMN latitude FLOAT;");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Users ADD COLUMN longitude FLOAT;");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Users ADD COLUMN locationSharing BOOLEAN DEFAULT 0;");
+    } catch (err) {}
+    try {
+      await sequelize.query("ALTER TABLE Users ADD COLUMN locationUpdatedAt DATETIME;");
+    } catch (err) {}
 
     // Ensure seed family exists
     let seedFamily = await Family.findOne({ where: { inviteCode: 'FAMILY' } });

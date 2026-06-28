@@ -73,6 +73,22 @@ export const User = sequelize.define('User', {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  latitude: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  longitude: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
+  locationSharing: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  locationUpdatedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 // --- Chat Model ---

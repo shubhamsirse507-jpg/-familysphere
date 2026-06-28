@@ -49,6 +49,7 @@ import { reactToMessage } from '../controllers/reactionController.js';
 import { getCircles, createCircle, joinCircle, deleteCircle } from '../controllers/circleController.js';
 import { createFamily, joinFamily, getMyFamily, findUserByContact, inviteMemberToFamily, sendInvite, acceptInvite, rejectInvite, getPendingInvites } from '../controllers/familyController.js';
 import { getNotifications, markAsRead, markAllAsRead } from '../controllers/notificationController.js';
+import { getFamilyLocations, updateLocation, toggleLocationSharing } from '../controllers/locationController.js';
 
 const router = express.Router();
 
@@ -137,6 +138,11 @@ router.get('/circles', protect, getCircles);
 router.post('/circles', protect, createCircle);
 router.post('/circles/:id/join', protect, joinCircle);
 router.delete('/circles/:id', protect, deleteCircle);
+
+// --- Location Routes ---
+router.post('/location/update', protect, updateLocation);
+router.post('/location/toggle', protect, toggleLocationSharing);
+router.get('/location/family', protect, getFamilyLocations);
 
 
 
