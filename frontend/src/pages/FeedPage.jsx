@@ -4,6 +4,7 @@ import useAuth from '../hooks/useAuth.js';
 import useSocket from '../hooks/useSocket.js';
 import Avatar from '../components/Avatar.jsx';
 import { API_BASE, resolveMediaUrl } from '../utils/config.js';
+import FamilyMap from './FamilyMap.jsx';
 
 // ─── Feed Sub-Tab ──────────────────────────────────────────────────────────────
 function FeedSubTab({ user, socket }) {
@@ -477,19 +478,20 @@ export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, shar
     <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'hidden' }}>
       <div>
         <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>Together</h3>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Family Feed, Memories &amp; Circles</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Family Feed, Memories, Circles & Map</p>
       </div>
 
       {/* Sub-tab switcher */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {[
           { id: 'feed', icon: '📰', label: 'Family Feed', desc: 'Posts & updates' },
-          { id: 'memories', icon: '📷', label: 'Memories', desc: '🚧 Coming Soon' },
-          { id: 'circles', icon: '⭕', label: 'Circles', desc: 'Soming Soon' }
+          { id: 'memories', icon: '📷', label: 'Memories', desc: 'Shared photos & videos' },
+          { id: 'circles', icon: '⭕', label: 'Circles', desc: 'Interest groups' },
+          { id: 'map', icon: '📍', label: 'Family Map', desc: 'Live locations' }
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setTogetherSubTab(tab.id === 'memories' ? 'feed' : tab.id)}
+            onClick={() => setTogetherSubTab(tab.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '12px',
               padding: '12px 14px', borderRadius: '14px', width: '100%',
@@ -530,10 +532,18 @@ export function FeedWorkspace({ togetherSubTab }) {
   const { socket } = useSocket();
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', height: '100%' }}>
+    <div style={{ flex: 1, overflowY: togetherSubTab === 'map' ? 'hidden' : 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
       {togetherSubTab === 'feed' && <FeedSubTab user={user} socket={socket} />}
       {togetherSubTab === 'memories' && <MemoriesSubTab user={user} />}
       {togetherSubTab === 'circles' && <CirclesSubTab user={user} socket={socket} />}
+      {togetherSubTab === 'map' && user?.familyId && <FamilyMap />}
+      {togetherSubTab === 'map' && !user?.familyId && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px', padding: '40px', textAlign: 'center' }}>
+          <div style={{ fontSize: '40px' }}>📍</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>Join a Family First</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '280px' }}>You need to be in a family group to use the live location map feature.</div>
+        </div>
+      )}
     </div>
   );
 }
