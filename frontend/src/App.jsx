@@ -46,8 +46,6 @@ export default function App() {
 
   // Global modals (not page-specific)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [pendingInvites, setPendingInvites] = useState([]);
-  const [showInviteDropdown, setShowInviteDropdown] = useState(false);
   const [addMemberForm, setAddMemberForm] = useState({ name: '', phone: '', email: '', password: '', role: 'Parent', profilePhoto: '' });
   const [addMemberError, setAddMemberError] = useState('');
   const [addMemberSuccess, setAddMemberSuccess] = useState('');
@@ -59,6 +57,11 @@ export default function App() {
   const [searchLoading, setSearchLoading]           = useState(false);
   const [inviteLoading, setInviteLoading]           = useState(false);
   const [inviteSuccess, setInviteSuccess]           = useState('');
+
+  // Unified notification center
+  const [notifications, setNotifications] = useState([]);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const { user, fetchProfile, handleLogout } = useAuth();
   const { socket, activeUsers } = useSocket();
@@ -139,21 +142,60 @@ export default function App() {
     }
   };
 
-  const fetchPendingInvites = async () => {
+  // ── Unified Notification Center ─────────────────────────────
+  const formatTimeAgo = (dateStr) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  const notifIcon = (type) => ({
+    message: '💬', post_like: '❤️', post_comment: '💬',
+    missed_call: '📞', family_invite: '👨‍👩‍👧', invite_accepted: '✅'
+  }[type] || '🔔');
+
+  const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${API_BASE}/family/pending-invites`, {
-        credentials: 'include',
-      });
+      const res = await fetch(`${API_BASE}/notifications`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setPendingInvites(data);
+        setNotifications(data);
+        setUnreadCount(data.filter(n => !n.isRead).length);
       }
     } catch (err) {
-      console.error('Failed to fetch pending invites:', err);
+      console.error('Failed to fetch notifications:', err);
     }
   };
 
-  const handleAcceptInvite = async (inviteId) => {
+  const handleMarkAsRead = async (notifId) => {
+    try {
+      await fetch(`${API_BASE}/notifications/${notifId}/read`, {
+        method: 'POST', credentials: 'include',
+      });
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Mark as read error:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await fetch(`${API_BASE}/notifications/read-all`, {
+        method: 'POST', credentials: 'include',
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Mark all as read error:', err);
+    }
+  };
+
+  const handleAcceptInvite = async (inviteId, notifId) => {
     try {
       const res = await fetch(`${API_BASE}/family/accept-invite`, {
         method: 'POST',
@@ -162,8 +204,9 @@ export default function App() {
         body: JSON.stringify({ inviteId }),
       });
       if (res.ok) {
-        setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+        if (notifId) await handleMarkAsRead(notifId);
         await fetchProfile();
+        await fetchNotifications();
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to accept invite.');
@@ -173,7 +216,7 @@ export default function App() {
     }
   };
 
-  const handleRejectInvite = async (inviteId) => {
+  const handleRejectInvite = async (inviteId, notifId) => {
     try {
       const res = await fetch(`${API_BASE}/family/reject-invite`, {
         method: 'POST',
@@ -182,7 +225,8 @@ export default function App() {
         body: JSON.stringify({ inviteId }),
       });
       if (res.ok) {
-        setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+        if (notifId) await handleMarkAsRead(notifId);
+        await fetchNotifications();
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to reject invite.');
@@ -192,25 +236,40 @@ export default function App() {
     }
   };
 
-  // Fetch pending invites on mount/user change and set up polling/socket listener
+  const handleNotifClick = async (notif) => {
+    if (!notif.isRead) await handleMarkAsRead(notif.id);
+    const meta = notif.metadata ? JSON.parse(notif.metadata) : {};
+    setShowNotificationDropdown(false);
+    if (notif.type === 'message' && meta.chatId) {
+      setActiveTab('chats');
+      setActiveChat(meta.chatId);
+    } else if (notif.type === 'post_like' || notif.type === 'post_comment') {
+      setActiveTab('together');
+      setTogetherSubTab('feed');
+      setMobileWorkspaceActive(true);
+    } else if (notif.type === 'missed_call') {
+      setActiveTab('calls');
+    }
+  };
+
+  // Fetch notifications on mount/user change, poll every 30s
   useEffect(() => {
     if (user) {
-      fetchPendingInvites();
-      const interval = setInterval(fetchPendingInvites, 30000);
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
 
+  // Real-time socket listener
   useEffect(() => {
     if (socket) {
-      const handleInviteReceived = (data) => {
-        console.log('[Socket] Family invite received:', data);
-        fetchPendingInvites();
+      const handleNewNotif = (notif) => {
+        setNotifications(prev => [notif, ...prev]);
+        setUnreadCount(prev => prev + 1);
       };
-      socket.on('family:invite_received', handleInviteReceived);
-      return () => {
-        socket.off('family:invite_received', handleInviteReceived);
-      };
+      socket.on('notification:new', handleNewNotif);
+      return () => socket.off('notification:new', handleNewNotif);
     }
   }, [socket]);
 
@@ -250,71 +309,125 @@ export default function App() {
             <button className="btn-icon" title="Add Family Member" onClick={() => { setAddMemberError(''); setAddMemberSuccess(''); setShowAddMemberModal(true); }}>
               <UserPlus size={18} />
             </button>
+
+            {/* ── Unified Notification Bell ─────────────────────── */}
             <div style={{ position: 'relative' }}>
-              <button className="btn-icon" title="Family Invites" onClick={() => setShowInviteDropdown(!showInviteDropdown)}>
+              <button
+                className="btn-icon"
+                title="Notifications"
+                onClick={() => setShowNotificationDropdown(v => !v)}
+                style={{ position: 'relative' }}
+              >
                 <Bell size={18} />
-                {pendingInvites.length > 0 && (
+                {unreadCount > 0 && (
                   <span style={{
-                    position: 'absolute',
-                    top: '-2px',
-                    right: '-2px',
-                    background: '#ef4444',
-                    color: '#fff',
-                    borderRadius: '50%',
-                    fontSize: '9px',
-                    width: '15px',
-                    height: '15px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '800',
-                    boxShadow: '0 0 0 2px var(--bg-secondary)'
+                    position: 'absolute', top: '-3px', right: '-3px',
+                    background: 'linear-gradient(135deg,#ef4444,#dc2626)',
+                    color: '#fff', borderRadius: '50%', fontSize: '9px',
+                    width: '16px', height: '16px', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    fontWeight: '800', boxShadow: '0 0 0 2px var(--bg-secondary)',
+                    animation: 'notif-pop 0.3s cubic-bezier(0.34,1.56,0.64,1)'
                   }}>
-                    {pendingInvites.length}
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
-              {showInviteDropdown && (
+
+              {showNotificationDropdown && (
                 <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: '0',
-                  marginTop: '8px',
-                  width: '300px',
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                  width: '320px', maxHeight: '440px',
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-glass)',
-                  borderRadius: '16px',
-                  boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
-                  zIndex: 2000,
-                  padding: '12px',
-                  maxHeight: '320px',
-                  overflowY: 'auto'
+                  borderRadius: '18px',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+                  zIndex: 3000, display: 'flex', flexDirection: 'column',
+                  animation: 'slideInDown 0.25s cubic-bezier(0.16,1,0.3,1)'
                 }}>
-                  <div style={{ fontWeight: '800', fontSize: '13px', marginBottom: '8px', color: 'var(--text-primary)', fontFamily: 'Outfit' }}>Pending Invites</div>
-                  {pendingInvites.length === 0 ? (
-                    <div style={{ padding: '8px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>No pending family invites.</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {pendingInvites.map(invite => (
-                        <div key={invite.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <img src={invite.sender?.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.sender?.name || '')}&background=random`} alt={invite.sender?.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                  {/* Header */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '14px 16px 10px', borderBottom: '1px solid var(--border-glass)',
+                    flexShrink: 0
+                  }}>
+                    <span style={{ fontWeight: '800', fontSize: '14px', fontFamily: 'Outfit', color: 'var(--text-primary)' }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button onClick={handleMarkAllAsRead} style={{
+                        fontSize: '11px', color: 'var(--color-primary)', fontWeight: '700',
+                        border: 'none', cursor: 'pointer', padding: '3px 8px',
+                        borderRadius: '8px', background: 'var(--color-primary-light)'
+                      }}>
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List */}
+                  <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>🔔</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>No notifications yet</div>
+                      </div>
+                    ) : notifications.map(notif => {
+                      const meta = notif.metadata ? JSON.parse(notif.metadata) : {};
+                      const isFamilyInvite = notif.type === 'family_invite' && !notif.isRead;
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={() => !isFamilyInvite && handleNotifClick(notif)}
+                          style={{
+                            display: 'flex', flexDirection: 'column', gap: '6px',
+                            padding: '11px 14px',
+                            background: notif.isRead ? 'transparent' : 'rgba(99,102,241,0.07)',
+                            borderBottom: '1px solid var(--border-glass)',
+                            cursor: isFamilyInvite ? 'default' : 'pointer',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => { if (!isFamilyInvite) e.currentTarget.style.background = 'var(--bg-tertiary)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = notif.isRead ? 'transparent' : 'rgba(99,102,241,0.07)'; }}
+                        >
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            {/* Icon */}
+                            <div style={{
+                              width: '34px', height: '34px', borderRadius: '10px', flexShrink: 0,
+                              background: 'var(--bg-tertiary)', display: 'flex',
+                              alignItems: 'center', justifyContent: 'center', fontSize: '16px'
+                            }}>
+                              {notifIcon(notif.type)}
+                            </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{invite.sender?.name}</div>
-                              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>wants you in <strong>{invite.Family?.name || 'their Family'}</strong></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{notif.title}</span>
+                                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0, marginLeft: '6px' }}>{formatTimeAgo(notif.createdAt)}</span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{notif.body}</div>
+                              {!notif.isRead && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-primary)', marginTop: '4px' }} />}
                             </div>
                           </div>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => { handleAcceptInvite(invite.id); setShowInviteDropdown(false); }} style={{ flex: 1, padding: '5px', borderRadius: '8px', border: 'none', background: '#22c55e', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Accept</button>
-                            <button onClick={() => { handleRejectInvite(invite.id); setShowInviteDropdown(false); }} style={{ flex: 1, padding: '5px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Reject</button>
-                          </div>
+                          {/* Inline Accept/Reject for family_invite */}
+                          {isFamilyInvite && meta.inviteId && (
+                            <div style={{ display: 'flex', gap: '6px', paddingLeft: '44px' }}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleAcceptInvite(meta.inviteId, notif.id); setShowNotificationDropdown(false); }}
+                                style={{ flex: 1, padding: '6px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                              >✓ Accept</button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRejectInvite(meta.inviteId, notif.id); }}
+                                style={{ flex: 1, padding: '6px', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                              >✕ Reject</button>
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
+            {/* ─────────────────────────────────────────────────── */}
+
             <button className="btn-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>

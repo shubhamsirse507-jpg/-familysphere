@@ -410,6 +410,39 @@ export const FamilyInvite = sequelize.define('FamilyInvite', {
   },
 });
 
+// --- Notification Model ---
+export const Notification = sequelize.define('Notification', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  type: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  body: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  isRead: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  metadata: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+});
+
 // =================== ASSOCIATIONS ===================
 
 // Chat <-> User (Many-to-Many via ChatMember)
@@ -529,6 +562,10 @@ FamilyInvite.belongsTo(User, { foreignKey: 'toUserId', as: 'receiver' });
 
 Family.hasMany(FamilyInvite, { foreignKey: 'familyId' });
 FamilyInvite.belongsTo(Family, { foreignKey: 'familyId' });
+
+// Notification associations
+User.hasMany(Notification, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Notification.belongsTo(User, { foreignKey: 'userId' });
 
 
 // Sync database function helper

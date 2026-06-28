@@ -48,6 +48,7 @@ import { getPosts, createPost, deletePost, likePost, addComment } from '../contr
 import { reactToMessage } from '../controllers/reactionController.js';
 import { getCircles, createCircle, joinCircle, deleteCircle } from '../controllers/circleController.js';
 import { createFamily, joinFamily, getMyFamily, findUserByContact, inviteMemberToFamily, sendInvite, acceptInvite, rejectInvite, getPendingInvites } from '../controllers/familyController.js';
+import { getNotifications, markAsRead, markAllAsRead } from '../controllers/notificationController.js';
 
 const router = express.Router();
 
@@ -145,5 +146,9 @@ router.post('/ai/translate', protect, translateMessage);
 router.post('/ai/voice-to-text', protect, voiceToText);
 router.post('/ai/moderate', protect, moderateMessage);
 router.post('/ai/assistant', protect, askAssistant);
+// --- Notification Routes ---
+router.get('/notifications', protect, getNotifications);
+router.post('/notifications/:id/read', protect, markAsRead);
+router.post('/notifications/read-all', protect, markAllAsRead);
 
 export default router;

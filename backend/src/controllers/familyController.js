@@ -1,5 +1,6 @@
-import { Family, User, FamilyInvite } from '../models/index.js';
+import { Family, User, FamilyInvite, Notification } from '../models/index.js';
 import { sendAuthCookies } from './authController.js';
+import { createNotification } from './notificationController.js';
 import { Op } from 'sequelize';
 
 const generateInviteCode = () => {
@@ -286,6 +287,11 @@ export const sendInvite = async (req, res) => {
       io.to(target.id).emit('family:invite_received', fullInvite);
     }
 
+    // Trigger notification for the target user
+    const requesterFamily = await Family.findByPk(requester.familyId);
+    const familyName = requesterFamily ? requesterFamily.name : 'their Family';
+    await createNotification(target.id, 'family_invite', 'Family Invite', `${requester.name} invited you to join ${familyName}`, { inviteId: invite.id });
+
     res.status(201).json({
       message: `Invite sent to ${target.name}!`,
       invite: fullInvite,
@@ -342,6 +348,24 @@ export const acceptInvite = async (req, res) => {
       io.to(target.id).emit('family:updated', { familyId: invite.familyId });
     }
 
+    // Trigger notification to the sender that invite was accepted
+    await createNotification(invite.fromUserId, 'invite_accepted', 'Invite Accepted', `${target.name} accepted your family invite`, { familyId: invite.familyId });
+
+    // Auto-mark the family invite notification as read
+    const notification = await Notification.findOne({
+      where: {
+        userId: req.user.id,
+        type: 'family_invite',
+        metadata: {
+          [Op.like]: `%${inviteId}%`
+        }
+      }
+    });
+    if (notification) {
+      notification.isRead = true;
+      await notification.save();
+    }
+
     res.json({
       message: 'Invite accepted. You have joined the family!',
       familyId: invite.familyId,
@@ -374,6 +398,21 @@ export const rejectInvite = async (req, res) => {
 
     invite.status = 'rejected';
     await invite.save();
+
+    // Auto-mark the family invite notification as read
+    const notification = await Notification.findOne({
+      where: {
+        userId: req.user.id,
+        type: 'family_invite',
+        metadata: {
+          [Op.like]: `%${inviteId}%`
+        }
+      }
+    });
+    if (notification) {
+      notification.isRead = true;
+      await notification.save();
+    }
 
     res.json({ message: 'Invite rejected.' });
   } catch (error) {

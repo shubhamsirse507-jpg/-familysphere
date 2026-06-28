@@ -18,6 +18,7 @@ import { Message, User, Chat, ChatMember, PollOption, PollVote, BlockedUser, Mes
 import { runSeeding } from './seed.js';
 import { requireAdmin } from './middleware/adminAuth.js';
 import { showLogin, processLogin, logout, showDashboard, downloadCSV } from './controllers/adminController.js';
+import { setIoInstance, createNotification } from './controllers/notificationController.js';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ const io = new Server(server, {
 });
 
 app.set('io', io);
+setIoInstance(io);
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -454,6 +456,23 @@ io.on('connection', async (socket) => {
 
       // Broadcast message to everyone in the chat room (including sender)
       io.to(chatId).emit('new_message', fullMessage);
+
+      // Trigger notifications for other chat members
+      for (const member of chatMembers) {
+        if (member.userId !== senderId) {
+          // Do not send notifications if AI sent it, or if it is AI user being notified
+          const recipient = await User.findByPk(member.userId, { attributes: ['role'] });
+          if (recipient && recipient.role !== 'AI') {
+            await createNotification(
+              member.userId,
+              'message',
+              'New Message',
+              `${fullMessage.sender?.name || 'Someone'} sent you a message`,
+              { chatId }
+            );
+          }
+        }
+      }
 
       // 3. AI Assistant Response Generation (if applicable)
       const aiUser = await User.findOne({ where: { role: 'AI' } });

@@ -1,5 +1,6 @@
 import { Call, User } from '../models/index.js';
 import { Op } from 'sequelize';
+import { createNotification } from './notificationController.js';
 
 export const createCallLog = async (req, res) => {
   try {
@@ -55,6 +56,12 @@ export const updateCallLog = async (req, res) => {
     }
     
     await call.save();
+
+    if (status === 'missed') {
+      const caller = await User.findByPk(call.callerId, { attributes: ['name'] });
+      const callerName = caller ? caller.name : 'Someone';
+      await createNotification(call.receiverId, 'missed_call', 'Missed Call', `You missed a call from ${callerName}`, { callId: call.id });
+    }
     
     const fullCall = await Call.findByPk(call.id, {
       include: [

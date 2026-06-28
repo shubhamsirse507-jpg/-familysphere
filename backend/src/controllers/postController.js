@@ -1,4 +1,5 @@
 import { Post, User, PostLike, PostComment } from '../models/index.js';
+import { createNotification } from './notificationController.js';
 import { familyWhere } from '../utils/family.js';
 
 export const getPosts = async (req, res) => {
@@ -113,6 +114,11 @@ export const likePost = async (req, res) => {
         postId: id,
         userId
       });
+      
+      // Trigger notification if liked by someone else
+      if (post.userId !== userId) {
+        await createNotification(post.userId, 'post_like', 'New Like', `${req.user.name} liked your post`, { postId: post.id });
+      }
     }
 
     const likes = await PostLike.findAll({
@@ -153,6 +159,11 @@ export const addComment = async (req, res) => {
       postId: id,
       userId: req.user.id
     });
+
+    // Trigger notification if commented by someone else
+    if (post.userId !== req.user.id) {
+      await createNotification(post.userId, 'post_comment', 'New Comment', `${req.user.name} commented on your post`, { postId: post.id });
+    }
 
     const fullComment = await PostComment.findByPk(comment.id, {
       include: [
