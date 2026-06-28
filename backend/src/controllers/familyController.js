@@ -1,4 +1,4 @@
-import { Family, User } from '../models/index.js';
+import { Family, User, FamilyInvite } from '../models/index.js';
 import { sendAuthCookies } from './authController.js';
 import { Op } from 'sequelize';
 
@@ -224,6 +224,187 @@ export const inviteMemberToFamily = async (req, res) => {
     });
   } catch (error) {
     console.error('Invite member error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const sendInvite = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required.' });
+    }
+
+    const requester = await User.findByPk(req.user.id);
+    if (!requester || !requester.familyId) {
+      return res.status(400).json({ error: 'You must be in a family before inviting others.' });
+    }
+    if (!['Parent', 'Admin', 'Guardian'].includes(requester.role)) {
+      return res.status(403).json({ error: 'Only a Parent, Admin, or Guardian can invite members.' });
+    }
+
+    const target = await User.findByPk(userId);
+    if (!target) {
+      return res.status(404).json({ error: 'Target user not found.' });
+    }
+
+    // Rule: If User B is already in a family -> block the invite, show error
+    if (target.familyId) {
+      return res.status(400).json({ error: 'This user is already in a family.' });
+    }
+
+    // Rule: If User B already has a pending invite -> don't send duplicate
+    const existingInvite = await FamilyInvite.findOne({
+      where: {
+        toUserId: target.id,
+        familyId: requester.familyId,
+        status: 'pending',
+      },
+    });
+    if (existingInvite) {
+      return res.status(400).json({ error: 'A pending invite has already been sent to this user.' });
+    }
+
+    // Create FamilyInvite record with status 'pending'
+    const invite = await FamilyInvite.create({
+      fromUserId: requester.id,
+      toUserId: target.id,
+      familyId: requester.familyId,
+      status: 'pending',
+    });
+
+    const fullInvite = await FamilyInvite.findByPk(invite.id, {
+      include: [
+        { model: User, as: 'sender', attributes: ['id', 'name', 'profilePhoto'] },
+        { model: Family, attributes: ['id', 'name'] },
+      ],
+    });
+
+    // Emit socket event 'family:invite_received' to target user
+    const io = req.app.get('io');
+    if (io) {
+      io.to(target.id).emit('family:invite_received', fullInvite);
+    }
+
+    res.status(201).json({
+      message: `Invite sent to ${target.name}!`,
+      invite: fullInvite,
+    });
+  } catch (error) {
+    console.error('Send invite error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const acceptInvite = async (req, res) => {
+  try {
+    const { inviteId } = req.body;
+    if (!inviteId) {
+      return res.status(400).json({ error: 'inviteId is required.' });
+    }
+
+    const invite = await FamilyInvite.findByPk(inviteId);
+    if (!invite) {
+      return res.status(404).json({ error: 'Invite not found.' });
+    }
+
+    if (invite.toUserId !== req.user.id) {
+      return res.status(403).json({ error: 'You are not authorized to accept this invite.' });
+    }
+
+    if (invite.status !== 'pending') {
+      return res.status(400).json({ error: 'This invite is no longer pending.' });
+    }
+
+    // Set status to accepted
+    invite.status = 'accepted';
+    await invite.save();
+
+    // Set target user familyId
+    const target = await User.findByPk(req.user.id);
+    if (!target) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (target.familyId) {
+      return res.status(400).json({ error: 'You are already in a family.' });
+    }
+
+    target.familyId = invite.familyId;
+    await target.save();
+
+    // Re-issue cookies with new familyId in JWT
+    sendAuthCookies(res, target, req.user.sessionId);
+
+    // Emit socket event 'family:updated' to target user
+    const io = req.app.get('io');
+    if (io) {
+      io.to(target.id).emit('family:updated', { familyId: invite.familyId });
+    }
+
+    res.json({
+      message: 'Invite accepted. You have joined the family!',
+      familyId: invite.familyId,
+    });
+  } catch (error) {
+    console.error('Accept invite error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const rejectInvite = async (req, res) => {
+  try {
+    const { inviteId } = req.body;
+    if (!inviteId) {
+      return res.status(400).json({ error: 'inviteId is required.' });
+    }
+
+    const invite = await FamilyInvite.findByPk(inviteId);
+    if (!invite) {
+      return res.status(404).json({ error: 'Invite not found.' });
+    }
+
+    if (invite.toUserId !== req.user.id) {
+      return res.status(403).json({ error: 'You are not authorized to reject this invite.' });
+    }
+
+    if (invite.status !== 'pending') {
+      return res.status(400).json({ error: 'This invite is no longer pending.' });
+    }
+
+    invite.status = 'rejected';
+    await invite.save();
+
+    res.json({ message: 'Invite rejected.' });
+  } catch (error) {
+    console.error('Reject invite error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const getPendingInvites = async (req, res) => {
+  try {
+    const invites = await FamilyInvite.findAll({
+      where: {
+        toUserId: req.user.id,
+        status: 'pending',
+      },
+      include: [
+        {
+          model: User,
+          as: 'sender',
+          attributes: ['id', 'name', 'profilePhoto'],
+        },
+        {
+          model: Family,
+          attributes: ['id', 'name'],
+        },
+      ],
+    });
+
+    res.json(invites);
+  } catch (error) {
+    console.error('Get pending invites error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };

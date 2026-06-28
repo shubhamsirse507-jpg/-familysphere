@@ -47,7 +47,7 @@ import { setup2FA, verify2FA, disable2FA } from '../controllers/twoFactorControl
 import { getPosts, createPost, deletePost, likePost, addComment } from '../controllers/postController.js';
 import { reactToMessage } from '../controllers/reactionController.js';
 import { getCircles, createCircle, joinCircle, deleteCircle } from '../controllers/circleController.js';
-import { createFamily, joinFamily, getMyFamily, findUserByContact, inviteMemberToFamily } from '../controllers/familyController.js';
+import { createFamily, joinFamily, getMyFamily, findUserByContact, inviteMemberToFamily, sendInvite, acceptInvite, rejectInvite, getPendingInvites } from '../controllers/familyController.js';
 
 const router = express.Router();
 
@@ -64,6 +64,10 @@ router.post('/family/create', protect, createFamily);
 router.post('/family/join', protect, joinFamily);
 router.get('/family/me', protect, getMyFamily);
 router.post('/family/invite-member', protect, inviteMemberToFamily);
+router.post('/family/send-invite', protect, sendInvite);
+router.post('/family/accept-invite', protect, acceptInvite);
+router.post('/family/reject-invite', protect, rejectInvite);
+router.get('/family/pending-invites', protect, getPendingInvites);
 
 const findUserLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

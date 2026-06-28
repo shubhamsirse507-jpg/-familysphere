@@ -385,6 +385,31 @@ export const CircleMember = sequelize.define('CircleMember', {
   role: { type: DataTypes.STRING, defaultValue: 'member' },
 });
 
+// --- FamilyInvite Model ---
+export const FamilyInvite = sequelize.define('FamilyInvite', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  fromUserId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  toUserId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  familyId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  status: {
+    type: DataTypes.STRING,
+    defaultValue: 'pending',
+  },
+});
+
 // =================== ASSOCIATIONS ===================
 
 // Chat <-> User (Many-to-Many via ChatMember)
@@ -495,6 +520,16 @@ Post.belongsTo(Family, { foreignKey: 'familyId' });
 
 Family.hasMany(Circle, { foreignKey: 'familyId' });
 Circle.belongsTo(Family, { foreignKey: 'familyId' });
+
+// FamilyInvite associations
+User.hasMany(FamilyInvite, { foreignKey: 'fromUserId', as: 'sentInvites' });
+User.hasMany(FamilyInvite, { foreignKey: 'toUserId', as: 'receivedInvites' });
+FamilyInvite.belongsTo(User, { foreignKey: 'fromUserId', as: 'sender' });
+FamilyInvite.belongsTo(User, { foreignKey: 'toUserId', as: 'receiver' });
+
+Family.hasMany(FamilyInvite, { foreignKey: 'familyId' });
+FamilyInvite.belongsTo(Family, { foreignKey: 'familyId' });
+
 
 // Sync database function helper
 export const syncDatabase = async (force = false) => {

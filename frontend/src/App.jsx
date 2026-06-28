@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check, ChevronRight } from 'lucide-react';
+import { Sun, Moon, LogOut, UserPlus, X, BarChart2, ShieldCheck, ShieldAlert, MessageSquarePlus, Users, Check, ChevronRight, Bell } from 'lucide-react';
 import { API_BASE } from './utils/config.js';
 import useAuth from './hooks/useAuth.js';
 import useSocket from './hooks/useSocket.js';
@@ -46,6 +46,8 @@ export default function App() {
 
   // Global modals (not page-specific)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [showInviteDropdown, setShowInviteDropdown] = useState(false);
   const [addMemberForm, setAddMemberForm] = useState({ name: '', phone: '', email: '', password: '', role: 'Parent', profilePhoto: '' });
   const [addMemberError, setAddMemberError] = useState('');
   const [addMemberSuccess, setAddMemberSuccess] = useState('');
@@ -59,7 +61,7 @@ export default function App() {
   const [inviteSuccess, setInviteSuccess]           = useState('');
 
   const { user, fetchProfile, handleLogout } = useAuth();
-  const { activeUsers } = useSocket();
+  const { socket, activeUsers } = useSocket();
   const {
     activeChat, setActiveChat,
     showPollBuilder, setShowPollBuilder,
@@ -116,7 +118,7 @@ export default function App() {
     setInviteSuccess('');
     setSearchError('');
     try {
-      const res = await fetch(`${API_BASE}/family/invite-member`, {
+      const res = await fetch(`${API_BASE}/family/send-invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -124,12 +126,11 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setSearchError(data.error || 'Could not add member.');
+        setSearchError(data.error || 'Could not send invite.');
       } else {
-        setInviteSuccess(`✅ ${data.user.name} has been added to your family!`);
+        setInviteSuccess(`✅ Invite sent to ${searchResult?.user?.name || 'user'}!`);
         setSearchResult(null);
         setSearchQuery('');
-        fetchUsersList(); // Refresh family members in UI
       }
     } catch {
       setSearchError('Connection error.');
@@ -137,6 +138,81 @@ export default function App() {
       setInviteLoading(false);
     }
   };
+
+  const fetchPendingInvites = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/family/pending-invites`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingInvites(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch pending invites:', err);
+    }
+  };
+
+  const handleAcceptInvite = async (inviteId) => {
+    try {
+      const res = await fetch(`${API_BASE}/family/accept-invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ inviteId }),
+      });
+      if (res.ok) {
+        setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+        await fetchProfile();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to accept invite.');
+      }
+    } catch (err) {
+      console.error('Accept invite error:', err);
+    }
+  };
+
+  const handleRejectInvite = async (inviteId) => {
+    try {
+      const res = await fetch(`${API_BASE}/family/reject-invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ inviteId }),
+      });
+      if (res.ok) {
+        setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to reject invite.');
+      }
+    } catch (err) {
+      console.error('Reject invite error:', err);
+    }
+  };
+
+  // Fetch pending invites on mount/user change and set up polling/socket listener
+  useEffect(() => {
+    if (user) {
+      fetchPendingInvites();
+      const interval = setInterval(fetchPendingInvites, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (socket) {
+      const handleInviteReceived = (data) => {
+        console.log('[Socket] Family invite received:', data);
+        fetchPendingInvites();
+      };
+      socket.on('family:invite_received', handleInviteReceived);
+      return () => {
+        socket.off('family:invite_received', handleInviteReceived);
+      };
+    }
+  }, [socket]);
 
   // Handle poll creation from ChatWorkspace
   const handleCreatePoll = (e) => {
@@ -170,10 +246,75 @@ export default function App() {
             </div>
             <h2 style={{ fontSize: '20px', fontFamily: 'Outfit', fontWeight: '800' }}>FamilySphere</h2>
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <button className="btn-icon" title="Add Family Member" onClick={() => { setAddMemberError(''); setAddMemberSuccess(''); setShowAddMemberModal(true); }}>
               <UserPlus size={18} />
             </button>
+            <div style={{ position: 'relative' }}>
+              <button className="btn-icon" title="Family Invites" onClick={() => setShowInviteDropdown(!showInviteDropdown)}>
+                <Bell size={18} />
+                {pendingInvites.length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    background: '#ef4444',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    fontSize: '9px',
+                    width: '15px',
+                    height: '15px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: '800',
+                    boxShadow: '0 0 0 2px var(--bg-secondary)'
+                  }}>
+                    {pendingInvites.length}
+                  </span>
+                )}
+              </button>
+              {showInviteDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: '0',
+                  marginTop: '8px',
+                  width: '300px',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-glass)',
+                  borderRadius: '16px',
+                  boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
+                  zIndex: 2000,
+                  padding: '12px',
+                  maxHeight: '320px',
+                  overflowY: 'auto'
+                }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', marginBottom: '8px', color: 'var(--text-primary)', fontFamily: 'Outfit' }}>Pending Invites</div>
+                  {pendingInvites.length === 0 ? (
+                    <div style={{ padding: '8px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>No pending family invites.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {pendingInvites.map(invite => (
+                        <div key={invite.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-glass)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <img src={invite.sender?.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(invite.sender?.name || '')}&background=random`} alt={invite.sender?.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{invite.sender?.name}</div>
+                              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>wants you in <strong>{invite.Family?.name || 'their Family'}</strong></div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button onClick={() => { handleAcceptInvite(invite.id); setShowInviteDropdown(false); }} style={{ flex: 1, padding: '5px', borderRadius: '8px', border: 'none', background: '#22c55e', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Accept</button>
+                            <button onClick={() => { handleRejectInvite(invite.id); setShowInviteDropdown(false); }} style={{ flex: 1, padding: '5px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Reject</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <button className="btn-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
