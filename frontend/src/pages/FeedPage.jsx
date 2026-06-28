@@ -56,8 +56,9 @@ function FeedSubTab({ user, socket }) {
     e.preventDefault();
     if (!newPostText.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/posts`, {
+      const res = await fetch(`${API_BASE}/posts`, {        
         method: 'POST',
+	credentials: 'include'
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: newPostText, mediaUrl: newPostImage })
       });
@@ -385,7 +386,7 @@ function CirclesSubTab({ user, socket }) {
   const fetchCircles = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/circles`);
+      const res = await fetch(`${API_BASE}/circles`, { credentials: 'include' });
       if (res.ok) setCircles(await res.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -405,12 +406,12 @@ function CirclesSubTab({ user, socket }) {
   };
 
   const handleJoin = async (circleId) => {
-    try { await fetch(`${API_BASE}/circles/${circleId}/join`, { method: 'POST' }); }
+    try { await fetch(`${API_BASE}/circles/${circleId}/join`, { method: 'POST', credentials: 'include' }); }
     catch (err) { console.error(err); }
   };
 
   const handleDelete = async (circleId) => {
-    try { await fetch(`${API_BASE}/circles/${circleId}`, { method: 'DELETE' }); }
+    try { await fetch(`${API_BASE}/circles/${circleId}`, { method: 'DELETE', credentials: 'include' }); }
     catch (err) { console.error(err); }
   };
 
