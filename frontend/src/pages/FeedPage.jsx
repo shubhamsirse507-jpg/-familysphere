@@ -489,7 +489,7 @@ export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, shar
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setTogetherSubTab(tab.id)}
+            onClick={() => setTogetherSubTab(tab.id === 'memories' ? 'feed' : tab.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '12px',
               padding: '12px 14px', borderRadius: '14px', width: '100%',
