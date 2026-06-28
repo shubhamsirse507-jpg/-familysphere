@@ -485,13 +485,13 @@ export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, shar
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {[
           { id: 'feed', icon: '📰', label: 'Family Feed', desc: 'Posts & updates' },
-          { id: 'memories', icon: '📷', label: 'Memories', desc: 'Shared photos & videos' },
+          { id: 'memories', icon: '📷', label: 'Memories', desc: '🚧 Coming Soon' },
           { id: 'circles', icon: '⭕', label: 'Circles', desc: 'Interest groups' },
           { id: 'map', icon: '📍', label: 'Family Map', desc: 'Live locations' }
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setTogetherSubTab(tab.id)}
+            onClick={() => setTogetherSubTab(tab.id === 'memories' ? 'feed' : tab.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '12px',
               padding: '12px 14px', borderRadius: '14px', width: '100%',
