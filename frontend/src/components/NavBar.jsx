@@ -10,27 +10,27 @@ export default function NavBar({ activeTab, setActiveTab, setActiveChat }) {
   return (
     <div className="bottom-nav">
       <button className={`nav-btn ${activeTab === 'chats' ? 'active' : ''}`} onClick={() => go('chats')}>
-        <MessageSquare size={20} />
+        <MessageSquare size={18} />
         <span>Chats</span>
       </button>
       <button className={`nav-btn ${activeTab === 'status' ? 'active' : ''}`} onClick={() => go('status')}>
-        <Camera size={20} />
+        <Camera size={18} />
         <span>Status</span>
       </button>
       <button className={`nav-btn ${activeTab === 'together' ? 'active' : ''}`} onClick={() => go('together')}>
-        <Users size={20} />
+        <Users size={18} />
         <span>Together</span>
       </button>
       <button className={`nav-btn ${activeTab === 'calls' ? 'active' : ''}`} onClick={() => go('calls')}>
-        <Phone size={20} />
+        <Phone size={18} />
         <span>Calls</span>
       </button>
       <button className={`nav-btn ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => go('ai')}>
-        <Brain size={20} />
+        <Brain size={18} />
         <span>AI Hub</span>
       </button>
       <button className={`nav-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => go('settings')}>
-        <Settings size={20} />
+        <Settings size={18} />
         <span>Settings</span>
       </button>
     </div>

@@ -525,7 +525,7 @@ export default function App() {
           {activeUsers.users.length === 0 ? (
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textAlign: 'center' }}>No users online</div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {activeUsers.users.slice(0, 5).map(u => (
                 <div key={u.id} title={`${u.name} (${u.role})${u.id === user?.id ? ' - You' : ''}`} style={{ position: 'relative', flexShrink: 0, width: '32px', height: '32px' }}>
                   <Avatar user={u} size="sm" borderStyle={{ border: '1.5px solid #22c55e', width: '32px', height: '32px' }} />
