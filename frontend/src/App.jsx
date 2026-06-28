@@ -336,7 +336,7 @@ export default function App() {
 
               {showNotificationDropdown && (
                 <div style={{
-                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                  position: 'absolute', top: 'calc(100% + 8px)', left: 0,
                   width: '320px', maxHeight: '440px',
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border-glass)',
