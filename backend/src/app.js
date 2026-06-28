@@ -668,17 +668,26 @@ io.on('connection', async (socket) => {
 const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
-    // Connect SQLite DB
+    // Connect DB (PostgreSQL on Render, SQLite locally)
     await connectDB();
     
-    // Auto sync tables and run incremental seed from CSV to sync any missing users
-    const dbExists = fs.existsSync(path.resolve(__dirname, '../database.sqlite'));
-    if (!dbExists) {
-      console.log('Database file not found. Running seed script with full CSV import...');
-      await runSeeding(true);
-    } else {
-      console.log('Database file exists. Syncing tables and running incremental CSV sync...');
+    const isPostgres = !!process.env.DATABASE_URL;
+
+    if (isPostgres) {
+      // On Render/PostgreSQL: NEVER force-sync (it drops all data).
+      // Always use incremental sync + migrations.
+      console.log('Production mode: running incremental DB sync (PostgreSQL)...');
       await runSeeding(false);
+    } else {
+      // Local SQLite: force-sync only when the database file is missing (first run)
+      const dbExists = fs.existsSync(path.resolve(__dirname, '../database.sqlite'));
+      if (!dbExists) {
+        console.log('SQLite database not found. Running full seed...');
+        await runSeeding(true);
+      } else {
+        console.log('SQLite database found. Running incremental sync...');
+        await runSeeding(false);
+      }
     }
 
 
@@ -689,9 +698,10 @@ const startServer = async () => {
     await ensureAIUser();
 
     server.listen(PORT, '0.0.0.0', () => {
+      const dbType = process.env.DATABASE_URL ? 'PostgreSQL (Production)' : 'SQLite (Development)';
       console.log(`===================================================`);
       console.log(`🚀 FamilySphere Backend Server running on Port ${PORT}`);
-      console.log(`🏠 Mode: Development (SQLite database)`);
+      console.log(`🏠 Database: ${dbType}`);
       console.log(`===================================================`);
     });
   } catch (error) {

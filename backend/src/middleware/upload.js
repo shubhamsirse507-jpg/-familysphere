@@ -1,6 +1,12 @@
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -15,25 +21,56 @@ const ALLOWED_MIME_TYPES = new Set([
   'video/x-msvideo', 'video/mpeg',
 ]);
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    let folder = 'familysphere/general';
-    const mime = file.mimetype?.toLowerCase();
-    if (req.route?.path?.includes('profile')) folder = 'familysphere/profile-photos';
-    else if (req.route?.path?.includes('memor')) folder = 'familysphere/memories';
-    else if (req.route?.path?.includes('post')) folder = 'familysphere/posts';
-    else if (req.route?.path?.includes('stor')) folder = 'familysphere/stories';
-    else if (req.route?.path?.includes('chat')) folder = 'familysphere/chat-media';
-    const isVideo = mime?.startsWith('video/');
-    return {
-      folder,
-      resource_type: isVideo ? 'video' : 'image',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'],
-      transformation: isVideo ? [] : [{ quality: 'auto', fetch_format: 'auto' }],
-    };
-  },
-});
+let storage;
+
+const isCloudinaryConfigured = 
+  process.env.CLOUDINARY_CLOUD_NAME && 
+  process.env.CLOUDINARY_API_KEY && 
+  process.env.CLOUDINARY_API_SECRET;
+
+if (isCloudinaryConfigured) {
+  storage = new CloudinaryStorage({
+    cloudinary,
+    params: async (req, file) => {
+      let folder = 'familysphere/general';
+      const mime = file.mimetype?.toLowerCase();
+      if (req.route?.path?.includes('profile')) folder = 'familysphere/profile-photos';
+      else if (req.route?.path?.includes('memor')) folder = 'familysphere/memories';
+      else if (req.route?.path?.includes('post')) folder = 'familysphere/posts';
+      else if (req.route?.path?.includes('stor')) folder = 'familysphere/stories';
+      else if (req.route?.path?.includes('chat')) folder = 'familysphere/chat-media';
+      const isVideo = mime?.startsWith('video/');
+      return {
+        folder,
+        resource_type: isVideo ? 'video' : 'image',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'],
+        transformation: isVideo ? [] : [{ quality: 'auto', fetch_format: 'auto' }],
+      };
+    },
+  });
+} else {
+  // Safe local disk storage fallback for developer/testing environments
+  storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        return cb(new Error('Unauthorized: no user identity found'), null);
+      }
+      const uploadDir = path.resolve(__dirname, '../../public/uploads', userId);
+      try {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir);
+      } catch (err) {
+        cb(new Error('Failed to create upload directory'), null);
+      }
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const randomName = `${Date.now()}_${Math.floor(Math.random() * 900000 + 100000)}${ext}`;
+      cb(null, randomName);
+    }
+  });
+}
 
 const fileFilter = (req, file, cb) => {
   const mime = file.mimetype?.toLowerCase();

@@ -24,7 +24,7 @@ async function run() {
   const loginRes = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'Shubham@family.com', password: '!@#Shubham!@#' })
+    body: JSON.stringify({ email: 'Shubham@family.com', password: 'Shubham@1942' })
   });
   const loginData = await loginRes.json();
   const token = loginData.token;

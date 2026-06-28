@@ -19,9 +19,11 @@ export const uploadMedia = async (req, res) => {
     }
 
     // Build the public-accessible URL path for this file
-    // Files are stored at: public/uploads/{userId}/{randomFilename}
-    // Served as static at: /uploads/{userId}/{randomFilename}
-    const fileUrl = req.file.path;
+    // If stored on Cloudinary, req.file.path is the remote URL.
+    // If stored locally, req.file.path is the absolute filepath, so we construct the relative static route.
+    const fileUrl = req.file.path && (req.file.path.startsWith('http://') || req.file.path.startsWith('https://'))
+      ? req.file.path
+      : `/uploads/${userId}/${req.file.filename}`;
 
     return res.status(200).json({
       url: fileUrl,

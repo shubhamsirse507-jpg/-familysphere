@@ -52,6 +52,25 @@ function parseCSV(content) {
   return results;
 }
 
+// Helper: run a column migration that works on both SQLite and PostgreSQL.
+// PostgreSQL supports IF NOT EXISTS; SQLite uses try/catch to swallow 'duplicate column' errors.
+const addColumnIfNotExists = async (table, column, definition) => {
+  const isPostgres = !!process.env.DATABASE_URL;
+  if (isPostgres) {
+    try {
+      await sequelize.query(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "${column}" ${definition};`);
+    } catch (err) {
+      // Ignore — column already exists or other transient issue
+    }
+  } else {
+    try {
+      await sequelize.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+    } catch (err) {
+      // Ignore duplicate column error from SQLite
+    }
+  }
+};
+
 export const runSeeding = async (force = true) => {
   try {
     await connectDB();
@@ -62,46 +81,20 @@ export const runSeeding = async (force = true) => {
     }
     console.log('Database synced.');
 
-    // Run migrations inside seed.js to make sure columns exist before querying User or seeding
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN shareType VARCHAR(255) DEFAULT 'family';");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN targetUserId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN targetChatId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Users ADD COLUMN familyId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Chats ADD COLUMN familyId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Stories ADD COLUMN familyId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Memories ADD COLUMN familyId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Posts ADD COLUMN familyId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Circles ADD COLUMN familyId CHAR(36);");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Users ADD COLUMN latitude FLOAT;");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Users ADD COLUMN longitude FLOAT;");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Users ADD COLUMN locationSharing BOOLEAN DEFAULT 0;");
-    } catch (err) {}
-    try {
-      await sequelize.query("ALTER TABLE Users ADD COLUMN locationUpdatedAt DATETIME;");
-    } catch (err) {}
+    // Run incremental migrations — dialect-safe via addColumnIfNotExists
+    await addColumnIfNotExists('Memories', 'shareType', "VARCHAR(255) DEFAULT 'family'");
+    await addColumnIfNotExists('Memories', 'targetUserId', 'CHAR(36)');
+    await addColumnIfNotExists('Memories', 'targetChatId', 'CHAR(36)');
+    await addColumnIfNotExists('Users',    'familyId',     'CHAR(36)');
+    await addColumnIfNotExists('Chats',    'familyId',     'CHAR(36)');
+    await addColumnIfNotExists('Stories',  'familyId',     'CHAR(36)');
+    await addColumnIfNotExists('Memories', 'familyId',     'CHAR(36)');
+    await addColumnIfNotExists('Posts',    'familyId',     'CHAR(36)');
+    await addColumnIfNotExists('Circles',  'familyId',     'CHAR(36)');
+    await addColumnIfNotExists('Users',    'latitude',     'FLOAT');
+    await addColumnIfNotExists('Users',    'longitude',    'FLOAT');
+    await addColumnIfNotExists('Users',    'locationSharing', 'BOOLEAN DEFAULT FALSE');
+    await addColumnIfNotExists('Users',    'locationUpdatedAt', 'TIMESTAMP');
 
     // Ensure seed family exists
     let seedFamily = await Family.findOne({ where: { inviteCode: 'FAMILY' } });
@@ -293,3 +286,4 @@ if (process.argv[1] && process.argv[1].endsWith('seed.js')) {
     process.exit(0);
   });
 }
+
