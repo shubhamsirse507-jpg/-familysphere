@@ -484,7 +484,7 @@ export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, shar
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {[
           { id: 'feed', icon: '📰', label: 'Family Feed', desc: 'Posts & updates' },
-          { id: 'memories', icon: '📷', label: 'Memories', desc: 'Shared photos & videos' },
+          { id: 'memories', icon: '📷', label: 'Memories', desc: '🚧 Coming Soon' },
           { id: 'circles', icon: '⭕', label: 'Circles', desc: 'Soming Soon' }
         ].map(tab => (
           <button
