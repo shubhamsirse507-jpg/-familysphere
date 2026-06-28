@@ -489,52 +489,57 @@ export default function App() {
         </div>
 
         {/* Logged-in User Card */}
-        <div style={{ margin: '12px 16px', padding: '14px 16px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--color-primary-light) 0%, rgba(99,102,241,0.08) 100%)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <Avatar user={user} size="md" borderStyle={{ border: '2px solid rgba(99,102,241,0.5)' }} />
-            <div style={{ position: 'absolute', bottom: '1px', right: '1px', width: '11px', height: '11px', borderRadius: '50%', background: '#22c55e', border: '2px solid var(--bg-primary)' }} />
+        <div style={{
+          margin: '8px 16px', padding: '8px 16px', height: '52px', maxHeight: '64px',
+          borderRadius: '12px', background: 'linear-gradient(135deg, var(--color-primary-light) 0%, rgba(99,102,241,0.08) 100%)',
+          border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', gap: '10px',
+          flexShrink: 0
+        }}>
+          <div style={{ position: 'relative', flexShrink: 0, width: '36px', height: '36px' }}>
+            <Avatar user={user} size="sm" borderStyle={{ border: '2px solid rgba(99,102,241,0.5)', width: '36px', height: '36px' }} />
+            <div style={{ position: 'absolute', bottom: '0', right: '0', width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e', border: '2px solid var(--bg-primary)' }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
-            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px', background: user.role === 'Host' ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'var(--color-primary)', color: '#fff' }}>{user.role}</span>
-              <span style={{ fontSize: '10px', color: '#22c55e', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />Online
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
+              <span style={{ fontSize: '9px', fontWeight: '700', padding: '1px 6px', borderRadius: '12px', background: user.role === 'Host' ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'var(--color-primary)', color: '#fff', flexShrink: 0 }}>{user.role}</span>
+            </div>
+            <div style={{ fontSize: '10px', color: '#22c55e', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />Online
             </div>
           </div>
         </div>
 
         {/* Live Active Users Panel */}
-        <div style={{ margin: '0 16px 12px', padding: '12px 16px', borderRadius: '14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-              <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#22c55e', display: 'block', animation: 'pulse-ring 1.4s ease-out infinite' }} />
-              <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Now</span>
-            </div>
-            <span style={{ fontSize: '11px', fontWeight: '800', background: activeUsers.count > 0 ? '#22c55e' : '#94a3b8', color: '#fff', padding: '2px 9px', borderRadius: '20px' }}>{activeUsers.count}</span>
+        <div style={{
+          margin: '0 16px 8px', padding: '4px 12px', height: '54px', maxHeight: '60px',
+          borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3px',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22c55e', display: 'block', animation: 'pulse-ring 1.4s ease-out infinite', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-primary)' }}>Active Now</span>
+            <span style={{ fontSize: '10px', fontWeight: '800', background: activeUsers.count > 0 ? '#22c55e' : '#94a3b8', color: '#fff', padding: '1px 6px', borderRadius: '10px', marginLeft: 'auto' }}>{activeUsers.count}</span>
           </div>
           {activeUsers.users.length === 0 ? (
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>No users online yet</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textAlign: 'center' }}>No users online</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {activeUsers.users.slice(0, 5).map(u => (
-                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <Avatar user={u} size="sm" borderStyle={{ border: '1.5px solid #22c55e', width: '28px', height: '28px' }} />
-                    <span style={{ position: 'absolute', bottom: '0', right: '0', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', border: '1.5px solid var(--bg-secondary)', display: 'block' }} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {u.name} {u.id === user?.id ? <span style={{ color: '#6366f1', fontSize: '10px' }}>(You)</span> : ''}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#22c55e', fontWeight: '500' }}>{u.role} · Online</div>
-                  </div>
+                <div key={u.id} title={`${u.name} (${u.role})${u.id === user?.id ? ' - You' : ''}`} style={{ position: 'relative', flexShrink: 0, width: '32px', height: '32px' }}>
+                  <Avatar user={u} size="sm" borderStyle={{ border: '1.5px solid #22c55e', width: '32px', height: '32px' }} />
+                  <span style={{ position: 'absolute', bottom: '0', right: '0', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', border: '1.5px solid var(--bg-secondary)', display: 'block' }} />
                 </div>
               ))}
               {activeUsers.users.length > 5 && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>+{activeUsers.users.length - 5} more online</div>
+                <div style={{
+                  padding: '4px 8px', borderRadius: '10px',
+                  background: 'var(--bg-tertiary)', border: '1px solid var(--border-glass)',
+                  fontSize: '9px', fontWeight: '700', color: 'var(--text-secondary)', flexShrink: 0
+                }}>
+                  +{activeUsers.users.length - 5} more
+                </div>
               )}
             </div>
           )}
