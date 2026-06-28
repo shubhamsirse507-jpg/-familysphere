@@ -474,102 +474,54 @@ function CirclesSubTab({ user, socket }) {
 
 // ─── Main Feed Page (Together Tab) ────────────────────────────────────────────
 export function FeedSidebar({ togetherSubTab, setTogetherSubTab, feedPosts, sharedPhotos, circlesList, stories }) {
-  const tabs = [
-    { id: 'feed', icon: '📰', label: 'Feed' },
-    { id: 'memories', icon: '📷', label: 'Memories' },
-    { id: 'circles', icon: '⭕', label: 'Circles' },
-    { id: 'map', icon: '📍', label: 'Map' }
-  ];
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* 1. Header (fixed) */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid var(--border-glass)',
-        flexShrink: 0
-      }}>
-        <h3 style={{ fontSize: '16px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>Together</h3>
-        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Family Feed, Memories, Circles &amp; Map</p>
+    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0, overflow: 'hidden' }}>
+      <div>
+        <h3 style={{ fontSize: '18px', fontFamily: 'Outfit', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>Together</h3>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Family Feed, Memories, Circles & Map</p>
       </div>
 
-      {/* 2. Tab Navigation - Horizontal Pill Row (fixed) */}
-      <div style={{
-        display: 'flex',
-        gap: '6px',
-        padding: '10px 16px',
-        overflowX: 'auto',
-        flexShrink: 0,
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-        WebkitOverflowScrolling: 'touch',
-        borderBottom: '1px solid var(--border-glass)'
-      }}>
-        {tabs.map(tab => {
-          const active = togetherSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setTogetherSubTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                height: '36px',
-                border: active ? 'none' : '1.5px solid var(--border-glass)',
-                background: active ? 'var(--color-primary)' : 'transparent',
-                color: active ? '#fff' : 'var(--text-secondary)',
-                fontWeight: active ? '700' : '500',
-                fontSize: '12px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'all 0.2s',
-                fontFamily: 'Outfit'
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>{tab.icon}</span>
-              {tab.label}
-            </button>
-          );
-        })}
+      {/* Sub-tab switcher */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {[
+          { id: 'feed', icon: '📰', label: 'Family Feed', desc: 'Posts & updates' },
+          { id: 'memories', icon: '📷', label: 'Memories', desc: 'Shared photos & videos' },
+          { id: 'circles', icon: '⭕', label: 'Circles', desc: 'Interest groups' },
+          { id: 'map', icon: '📍', label: 'Family Map', desc: 'Live locations' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setTogetherSubTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '12px 14px', borderRadius: '14px', width: '100%',
+              background: togetherSubTab === tab.id ? 'var(--color-primary-light)' : 'var(--bg-tertiary)',
+              border: togetherSubTab === tab.id ? '1.5px solid var(--color-primary)' : '1.5px solid transparent',
+              cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s'
+            }}
+          >
+            <span style={{ fontSize: '22px', lineHeight: 1 }}>{tab.icon}</span>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: togetherSubTab === tab.id ? 'var(--color-primary)' : 'var(--text-primary)' }}>{tab.label}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{tab.desc}</div>
+            </div>
+          </button>
+        ))}
       </div>
 
-      {/* 3. Scrollable Content Area (flex: 1, overflow-y: auto) */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
-        padding: '12px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
-      }}>
-        {/* Stats Row */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px 12px',
-          background: 'var(--bg-tertiary)',
-          borderRadius: '12px',
-          padding: '8px 12px',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>📝</span>
-            <span style={{ color: 'var(--color-primary)', fontWeight: '800' }}>{feedPosts || 0}</span>
-            <span>posts</span>
+      {/* Quick stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: 'auto' }}>
+        {[
+          { count: feedPosts, label: 'Posts' },
+          { count: sharedPhotos, label: 'Memories' },
+          { count: circlesList, label: 'Circles' },
+          { count: stories, label: 'Stories' }
+        ].map(({ count, label }) => (
+          <div key={label} style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '10px 12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--color-primary)' }}>{count}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{label}</div>
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>👥</span>
-            <span style={{ color: 'var(--color-primary)', fontWeight: '800' }}>{circlesList || 0}</span>
-            <span>members</span>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
