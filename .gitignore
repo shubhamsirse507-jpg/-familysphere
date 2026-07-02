@@ -65,3 +65,4 @@ node_modules/
 backend/.env
 frontend/.env.local
 node_modules/
+*.zip
