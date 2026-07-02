@@ -56,3 +56,6 @@ check_*.js
 console.log('Backend
 u.name)))
 frontend/.env.local
+backend/.env
+frontend/.env.local
+node_modules/
